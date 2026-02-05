@@ -11,7 +11,7 @@ import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useGenerationStore } from "@/lib/store/generation-store"
 import { GenerationRequest, Provider } from "@/lib/types"
-import { useToast } from "@/components/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 
 const SAMPLE_VIDEOS: Record<Provider, string> = {
