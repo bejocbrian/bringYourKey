@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Video, Images, Key } from "lucide-react"
+import { LayoutDashboard, Video, Images, Key, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
+import { useAdminStore } from "@/lib/store/admin-store"
 import { Provider } from "@/lib/types"
 
 const navigation = [
@@ -18,6 +19,16 @@ const navigation = [
 export function MainSidebar() {
   const pathname = usePathname()
   const { hasKey } = useApiKeysStore()
+  const { currentUserId, isProviderAllowedForUser } = useAdminStore()
+
+  const getProviderStatus = (providerId: Provider) => {
+    const hasApiKey = hasKey(providerId)
+    const hasAccess = isProviderAllowedForUser(currentUserId, providerId)
+    
+    if (!hasAccess) return 'locked'
+    if (hasApiKey) return 'ready'
+    return 'no-key'
+  }
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r bg-card lg:block">
@@ -52,15 +63,26 @@ export function MainSidebar() {
           <div className="rounded-lg bg-muted p-3">
             <p className="text-xs font-semibold text-muted-foreground">Provider Status</p>
             <div className="mt-3 space-y-2">
-              {Object.entries(PROVIDERS).map(([id, provider]) => (
-                <div key={id} className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{provider.name}</span>
-                  <span className={cn(
-                    "h-2 w-2 rounded-full",
-                    hasKey(id as Provider) ? "bg-emerald-500" : "bg-muted-foreground/40"
-                  )} />
-                </div>
-              ))}
+              {Object.entries(PROVIDERS).map(([id, provider]) => {
+                const status = getProviderStatus(id as Provider)
+                return (
+                  <div key={id} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{provider.name}</span>
+                    <div className="flex items-center gap-1">
+                      {status === 'locked' && (
+                        <span title="Access denied">
+                          <Lock className="h-3 w-3 text-rose-500" />
+                        </span>
+                      )}
+                      <span className={cn(
+                        "h-2 w-2 rounded-full",
+                        status === 'ready' ? "bg-emerald-500" : 
+                        status === 'locked' ? "bg-rose-500" : "bg-muted-foreground/40"
+                      )} />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

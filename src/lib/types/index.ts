@@ -92,3 +92,13 @@ export interface AnalyticsData {
     count: number;
   };
 }
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  status: 'active' | 'inactive' | 'suspended';
+  allowedProviders: Provider[];
+  lastActive: string;
+  generationsCount: number;
+}

@@ -6,7 +6,8 @@ import {
   ProviderConfig, 
   AppSettings, 
   AnalyticsData, 
-  Provider 
+  Provider,
+  User
 } from '@/lib/types';
 
 interface AdminState {
@@ -33,6 +34,14 @@ interface AdminState {
   // Analytics (mock for MVP)
   analytics: AnalyticsData;
   refreshAnalytics: () => void;
+
+  // Users and provider access
+  users: User[];
+  currentUserId: string;
+  setCurrentUser: (userId: string) => void;
+  toggleUserProviderAccess: (userId: string, provider: Provider) => void;
+  getUserAllowedProviders: (userId: string) => Provider[];
+  isProviderAllowedForUser: (userId: string, provider: Provider) => boolean;
 }
 
 const defaultFeatures: FeatureFlag[] = [
@@ -128,6 +137,54 @@ const mockAnalytics: AnalyticsData = {
   }
 };
 
+const defaultUsers: User[] = [
+  {
+    id: 'user-1',
+    name: 'Alex Johnson',
+    email: 'alex@example.com',
+    status: 'active',
+    allowedProviders: ['google-veo', 'meta-moviegen', 'runway-gen3'],
+    lastActive: new Date().toISOString(),
+    generationsCount: 124
+  },
+  {
+    id: 'user-2',
+    name: 'Sarah Chen',
+    email: 'sarah@example.com',
+    status: 'active',
+    allowedProviders: ['google-veo', 'meta-moviegen'],
+    lastActive: new Date(Date.now() - 86400000).toISOString(),
+    generationsCount: 89
+  },
+  {
+    id: 'user-3',
+    name: 'Mike Williams',
+    email: 'mike@example.com',
+    status: 'active',
+    allowedProviders: ['google-veo'],
+    lastActive: new Date(Date.now() - 172800000).toISOString(),
+    generationsCount: 45
+  },
+  {
+    id: 'user-4',
+    name: 'Emily Davis',
+    email: 'emily@example.com',
+    status: 'inactive',
+    allowedProviders: ['google-veo', 'meta-moviegen', 'runway-gen3'],
+    lastActive: new Date(Date.now() - 604800000).toISOString(),
+    generationsCount: 12
+  },
+  {
+    id: 'user-5',
+    name: 'David Brown',
+    email: 'david@example.com',
+    status: 'suspended',
+    allowedProviders: [],
+    lastActive: new Date(Date.now() - 2592000000).toISOString(),
+    generationsCount: 0
+  }
+];
+
 export const useAdminStore = create<AdminState>()(
   persist(
     (set, get) => ({
@@ -137,6 +194,8 @@ export const useAdminStore = create<AdminState>()(
       providerConfigs: defaultProviderConfigs,
       settings: defaultSettings,
       analytics: mockAnalytics,
+      users: defaultUsers,
+      currentUserId: defaultUsers[0].id,
 
       login: (username, password) => {
         // Simple password-based auth for MVP
@@ -189,6 +248,36 @@ export const useAdminStore = create<AdminState>()(
 
       refreshAnalytics: () => {
         set({ analytics: mockAnalytics });
+      },
+
+      setCurrentUser: (userId) => {
+        set({ currentUserId: userId });
+      },
+
+      toggleUserProviderAccess: (userId, provider) => {
+        set((state) => ({
+          users: state.users.map((user) => {
+            if (user.id !== userId) return user;
+            const isAllowed = user.allowedProviders.includes(provider);
+            return {
+              ...user,
+              allowedProviders: isAllowed
+                ? user.allowedProviders.filter((p) => p !== provider)
+                : [...user.allowedProviders, provider]
+            };
+          })
+        }));
+      },
+
+      getUserAllowedProviders: (userId) => {
+        const user = get().users.find((u) => u.id === userId);
+        return user?.allowedProviders ?? [];
+      },
+
+      isProviderAllowedForUser: (userId, provider) => {
+        const user = get().users.find((u) => u.id === userId);
+        if (!user) return false;
+        return user.allowedProviders.includes(provider);
       },
     }),
     {

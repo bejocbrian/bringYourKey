@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { Download, Loader2, Sparkles, Video } from "lucide-react"
+import { Download, Loader2, Sparkles, Video, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useGenerationStore } from "@/lib/store/generation-store"
+import { useAdminStore } from "@/lib/store/admin-store"
 import { GenerationRequest, Provider } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
@@ -23,6 +24,7 @@ const SAMPLE_VIDEOS: Record<Provider, string> = {
 export default function GeneratePage() {
   const { hasKey, getDecryptedKey } = useApiKeysStore()
   const { generations, addGeneration, updateGeneration, activeGenerations } = useGenerationStore()
+  const { currentUserId, users, isProviderAllowedForUser } = useAdminStore()
   const { toast } = useToast()
 
   const [prompt, setPrompt] = useState("")
@@ -32,6 +34,9 @@ export default function GeneratePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const timeouts = useRef<NodeJS.Timeout[]>([])
 
+  const currentUser = users.find(u => u.id === currentUserId)
+  const allowedProviders = currentUser?.allowedProviders ?? []
+
   useEffect(() => {
     return () => {
       timeouts.current.forEach((timeout) => clearTimeout(timeout))
@@ -40,7 +45,9 @@ export default function GeneratePage() {
 
   const promptLimit = 500
   const providerConfig = PROVIDERS[selectedProvider]
-  const canGenerate = hasKey(selectedProvider)
+  const hasApiKey = hasKey(selectedProvider)
+  const isProviderAllowed = isProviderAllowedForUser(currentUserId, selectedProvider)
+  const canGenerate = hasApiKey && isProviderAllowed
 
   useEffect(() => {
     if (!providerConfig.supportedRatios.includes(aspectRatio)) {
@@ -57,6 +64,15 @@ export default function GeneratePage() {
         variant: "destructive",
         title: "Prompt required",
         description: "Tell us what you want to generate before starting.",
+      })
+      return
+    }
+
+    if (!isProviderAllowed) {
+      toast({
+        variant: "destructive",
+        title: "Provider access denied",
+        description: "You do not have permission to use this provider. Contact your administrator.",
       })
       return
     }
@@ -158,16 +174,33 @@ export default function GeneratePage() {
                   <SelectValue placeholder="Select a provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PROVIDERS).map(([providerId, provider]) => (
-                    <SelectItem key={providerId} value={providerId}>
-                      {provider.name}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(PROVIDERS).map(([providerId, provider]) => {
+                    const hasAccess = allowedProviders.includes(providerId as Provider)
+                    return (
+                      <SelectItem 
+                        key={providerId} 
+                        value={providerId}
+                        disabled={!hasAccess}
+                      >
+                        <div className="flex items-center gap-2">
+                          {provider.name}
+                          {!hasAccess && (
+                            <Lock className="h-3 w-3 text-muted-foreground" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
-              {!canGenerate && (
+              {!hasApiKey && (
                 <p className="text-xs text-muted-foreground">
                   No API key found. <Link className="text-primary hover:underline" href="/api-keys">Add a key</Link> to enable generation.
+                </p>
+              )}
+              {!isProviderAllowed && hasApiKey && (
+                <p className="text-xs text-destructive">
+                  You do not have access to this provider. Contact your administrator.
                 </p>
               )}
             </div>
