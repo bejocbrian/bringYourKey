@@ -1,9 +1,13 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Video, Images, Key, Lock } from "lucide-react"
+import { useSession, signOut } from "next-auth/react"
+import { LayoutDashboard, Video, Images, Key, Lock, LogOut, User } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useAdminStore } from "@/lib/store/admin-store"
@@ -18,6 +22,7 @@ const navigation = [
 
 export function MainSidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
   const { hasKey } = useApiKeysStore()
   const { currentUserId, isProviderAllowedForUser } = useAdminStore()
 
@@ -28,6 +33,10 @@ export function MainSidebar() {
     if (!hasAccess) return 'locked'
     if (hasApiKey) return 'ready'
     return 'no-key'
+  }
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: "/login" })
   }
 
   return (
@@ -59,6 +68,47 @@ export function MainSidebar() {
           })}
         </nav>
 
+        {session && (
+          <>
+            <Separator />
+            <div className="p-4">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
+                {session.user?.image ? (
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name || "User"}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {session.user?.name || "User"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {session.user?.email}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="h-8 w-8 p-0"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+
+        <Separator />
+        
         <div className="border-t p-4">
           <div className="rounded-lg bg-muted p-3">
             <p className="text-xs font-semibold text-muted-foreground">Provider Status</p>
