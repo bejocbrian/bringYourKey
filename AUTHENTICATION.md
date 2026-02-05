@@ -1,70 +1,75 @@
 # Authentication Implementation
 
-This document describes the Google-only authentication system with disposable email domain blocking that has been implemented.
+This document describes the Supabase email/password authentication system with email verification and disposable email domain blocking.
 
 ## Overview
 
-The authentication system uses NextAuth.js (v5) with Google OAuth provider and includes protection against disposable/temporary email addresses during sign-in.
+The authentication system uses Supabase Auth with email/password credentials and includes:
+- Email verification required before accessing the app
+- Protection against disposable/temporary email addresses during signup
+- Session management with secure cookies
+- Route protection for main app routes
 
 ## Features
 
-- ✅ Google OAuth authentication only
+- ✅ Email/password authentication
+- ✅ Required email verification
 - ✅ Disposable email domain blocking
 - ✅ Route protection for main app
 - ✅ Admin routes remain separate and unaffected
 - ✅ User session management
-- ✅ Sign-in/sign-out functionality
+- ✅ Sign-in/sign-up/sign-out functionality
 - ✅ Clean integration with existing UI
 
 ## Files Modified/Created
 
 ### New Files
+- `src/lib/supabase/client.ts` - Browser client for Supabase
+- `src/lib/supabase/server.ts` - Server client for Supabase
+- `src/lib/supabase/middleware.ts` - Middleware session helper
 - `src/lib/auth/disposable-domains.ts` - List of disposable email domains and validation function
-- `src/lib/auth/nextauth.ts` - NextAuth configuration with Google provider and disposable email checking
-- `src/app/api/auth/[...nextauth]/route.ts` - API route handler for NextAuth
+- `src/app/signup/page.tsx` - Signup page with email/password
+- `src/app/login/page.tsx` - Login page with email/password
+- `src/app/verify/page.tsx` - Email verification page
 - `src/middleware.ts` - Route protection middleware
-- `src/app/login/page.tsx` - Login page with Google sign-in button
-- `src/components/session-provider.tsx` - NextAuth session provider wrapper
-- `src/types/next-auth.d.ts` - TypeScript declarations for NextAuth
-- `src/components/ui/separator.tsx` - Separator UI component (required dependency)
-- `src/components/ui/alert.tsx` - Alert UI component (required for login page)
+- `src/components/supabase-provider.tsx` - Supabase user context provider
 
 ### Modified Files
-- `src/app/layout.tsx` - Added SessionProvider wrapper
-- `src/components/layout/main-sidebar.tsx` - Added user info display and sign-out button
-- `package.json` - Added next-auth and @radix-ui/react-separator dependencies
+- `src/app/layout.tsx` - Removed NextAuth SessionProvider
+- `src/components/layout/main-sidebar.tsx` - Updated to use Supabase auth
+- `.env.example` - Updated with Supabase environment variables
+
+### Removed Files
+- `src/lib/auth/nextauth.ts` - Removed NextAuth configuration
+- `src/components/session-provider.tsx` - Removed NextAuth session provider
+- `src/app/api/auth/[...nextauth]/route.ts` - Removed NextAuth API routes
+- `src/types/next-auth.d.ts` - Removed NextAuth type declarations
 
 ## Environment Variables Required
 
 Create a `.env.local` file with the following variables:
 
 ```bash
-# Google OAuth credentials
-GOOGLE_CLIENT_ID=your_google_client_id_here
-GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-
-# NextAuth configuration
-NEXTAUTH_SECRET=your_nextauth_secret_here
-NEXTAUTH_URL=http://localhost:3000
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://kmsunnrcrpbjhwuecscr.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
-## Setup Instructions
+## Supabase Setup Instructions
 
-### 1. Google OAuth Setup
+### 1. Create a Supabase Project
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google+ API
-4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client IDs"
-5. Set application type to "Web application"
-6. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-7. Copy Client ID and Client Secret to your `.env.local` file
+1. Go to [Supabase Dashboard](https://app.supabase.com/)
+2. Create a new project or use an existing one
+3. Copy the Project URL and Anon Key from Project Settings → API
+4. Add these to your `.env.local` file
 
-### 2. Generate NEXTAUTH_SECRET
+### 2. Configure Email Settings
 
-```bash
-openssl rand -base64 32
-```
+1. In Supabase Dashboard, go to Authentication → Providers → Email
+2. Enable "Confirm email" to require email verification
+3. Configure the Site URL: `http://localhost:3000`
+4. Configure Redirect URLs: Add `http://localhost:3000/verify`
 
 ### 3. Install Dependencies
 
@@ -84,29 +89,43 @@ All main app routes require authentication:
 ### Public Routes
 These routes are accessible without authentication:
 - `/login`
+- `/signup`
+- `/verify`
 - `/admin/*` (admin area remains separate)
-- `/api/auth/*` (NextAuth endpoints)
 
 ### How It Works
 
 1. **Middleware Protection**: The `middleware.ts` file intercepts all requests (except public routes) and checks for an active session
 2. **No Session Redirect**: If no session is found, users are redirected to `/login` with a `callbackUrl` parameter
-3. **Session Validation**: NextAuth validates JWT tokens and manages session state
-4. **Disposable Email Check**: During sign-in, the email domain is checked against a list of disposable domains
+3. **Session Validation**: Supabase validates JWT tokens and manages session state
+4. **Disposable Email Check**: During signup, the email domain is checked against a list of disposable domains
 
 ## User Flow
 
+### Sign-Up Process
+1. User visits `/signup`
+2. User enters email and password
+3. **Disposable email check**: If email domain is in disposable list, signup is rejected
+4. Password must be at least 8 characters
+5. Upon successful signup, user is redirected to `/verify` with email parameter
+6. Verification email is sent with OTP code
+
+### Email Verification Process
+1. User receives verification email with 6-digit code
+2. User enters the code on the `/verify` page
+3. Upon successful verification, user is redirected to the dashboard
+4. User can also request a new code if needed
+
 ### Sign-In Process
-1. User visits any protected route (or `/login` directly)
-2. If not authenticated, redirected to `/login`
-3. User clicks "Continue with Google" button
-4. Google OAuth flow initiates
-5. **Disposable email check**: If email domain is in disposable list, sign-in is rejected
-6. Upon successful authentication, user is redirected to original page
+1. User visits `/login` (or is redirected from protected route)
+2. User enters email and password
+3. **Disposable email check**: If email domain is in disposable list, sign-in is rejected
+4. **Email verification check**: If email is not verified, user is redirected to `/verify`
+5. Upon successful authentication, user is redirected to original page or dashboard
 
 ### Sign-Out Process
 1. User clicks the sign-out button in the sidebar
-2. NextAuth session is cleared
+2. Supabase session is cleared
 3. User is redirected to `/login`
 
 ## Disposable Email Blocking
@@ -123,11 +142,11 @@ The system includes a comprehensive list of disposable email domains from popula
 
 ### How to Test Disposable Email Blocking
 
-1. Create a Google account with a temporary email from services like:
-   - `10minutemail.com`
-   - `guerrillamail.com`
-   - `yopmail.com`
-2. Attempt to sign in - the process should be rejected with an error message
+1. Try to sign up with a temporary email from services like:
+   - `user@10minutemail.com`
+   - `user@guerrillamail.com`
+   - `user@yopmail.com`
+2. The signup should be rejected with an error message
 
 ## Customization
 
@@ -139,42 +158,53 @@ Edit `src/lib/auth/disposable-domains.ts` to add new domains to the `DISPOSABLE_
 
 Edit `src/middleware.ts` to change which routes require authentication.
 
-### Styling the Login Page
+### Changing Redirect URLs
 
-The login page is fully customizable. Edit `src/app/login/page.tsx` to modify the appearance.
+Update the redirect URLs in:
+- `src/app/signup/page.tsx` - `emailRedirectTo` option
+- `src/app/verify/page.tsx` - Redirect after verification
+- `src/middleware.ts` - Login redirect URL
+
+For production, update the Site URL and Redirect URLs in your Supabase project settings.
 
 ## Security Considerations
 
 1. **Environment Variables**: Never commit `.env.local` file to version control
-2. **HTTPS in Production**: Ensure `NEXTAUTH_URL` uses `https://` in production
-3. **Secret Rotation**: Regularly rotate `NEXTAUTH_SECRET`
-4. **Google OAuth Security**: Keep Google OAuth credentials secure and enable proper security settings in Google Cloud Console
+2. **HTTPS in Production**: Ensure your site uses `https://` in production
+3. **Supabase Security**: Keep your Supabase Anon Key secure
+4. **Row Level Security**: Enable RLS on your Supabase tables for additional security
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **"Invalid redirect URI" error**: Ensure your Google OAuth redirect URI matches exactly: `http://localhost:3000/api/auth/callback/google`
+1. **"Invalid login credentials" error**: Check that email and password are correct
 
-2. **"Invalid client" error**: Check that `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are correctly set
+2. **"Email not confirmed" error**: User needs to verify their email before logging in
 
 3. **Environment variables not loading**: Ensure `.env.local` file is in the project root and run `npm run dev` to restart the development server
 
-4. **Session not persisting**: Check that `NEXTAUTH_SECRET` is set and valid
+4. **Session not persisting**: Check that Supabase credentials are correct and the project is active
+
+5. **Email verification not working**: Check Supabase Auth settings to ensure email confirmation is enabled
 
 ### Development vs Production
 
-- Development: Use `http://localhost:3000` as `NEXTAUTH_URL`
-- Production: Use your actual domain with `https://`
+- Development: Use `http://localhost:3000` for redirects
+- Production: Update Site URL and Redirect URLs in Supabase project settings to your production domain with `https://`
 
 ## Testing the Implementation
 
 1. Start the development server: `npm run dev`
 2. Visit `http://localhost:3000` - you should be redirected to `/login`
-3. Try to sign in with a regular Gmail account - should work
-4. Try to sign in with a disposable email - should be blocked
-5. Once signed in, visit protected routes directly - should work
-6. Sign out and try to access protected routes - should redirect to login
+3. Click "Sign up" to create a new account
+4. Try to sign up with a disposable email - should be blocked
+5. Sign up with a valid email - should redirect to `/verify`
+6. Check your email for the verification code
+7. Enter the code on the verify page
+8. Once verified, you should be redirected to the dashboard
+9. Try to access protected routes directly - should work
+10. Sign out and try to access protected routes - should redirect to login
 
 ## Integration Notes
 

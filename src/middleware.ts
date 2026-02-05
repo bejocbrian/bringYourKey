@@ -1,12 +1,14 @@
-import { auth } from "@/lib/auth/nextauth"
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { updateSession } from "@/lib/supabase/middleware"
 
-export default auth((req) => {
-  const { nextUrl } = req
-  const isAuthenticated = !!req.auth
+export async function middleware(request: NextRequest) {
+  const { supabaseResponse, user } = await updateSession(request)
+
+  const { nextUrl } = request
+  const isAuthenticated = !!user
 
   // Public routes that don't require authentication
-  const publicRoutes = ["/login", "/admin", "/admin/**", "/api/auth/**"]
+  const publicRoutes = ["/login", "/signup", "/verify", "/admin", "/admin/**"]
   
   // Check if the current route is public
   const isPublicRoute = publicRoutes.some(route => {
@@ -24,13 +26,13 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl)
   }
 
-  // If user is authenticated and trying to access login page, redirect to home
-  if (isAuthenticated && nextUrl.pathname === "/login") {
+  // If user is authenticated and trying to access login/signup page, redirect to home
+  if (isAuthenticated && (nextUrl.pathname === "/login" || nextUrl.pathname === "/signup")) {
     return NextResponse.redirect(new URL("/", nextUrl.origin))
   }
 
-  return NextResponse.next()
-})
+  return supabaseResponse
+}
 
 export const config = {
   matcher: [
@@ -41,6 +43,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files (public folder)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public|api/auth).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
   ],
 }
