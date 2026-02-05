@@ -153,7 +153,7 @@ export const useAdminStore = create<AdminState>()(
         return false;
       },
 
-      logout: () => set({ isAuthenticated: true, adminUser: null, isAuthenticated: false }), // typo fixed in my head but let's be careful
+      logout: () => set({ isAuthenticated: false, adminUser: null }),
 
       toggleFeature: (id) => set((state) => ({
         features: state.features.map(f => 

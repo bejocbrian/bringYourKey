@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Calendar, Download, Filter, RefreshCw } from "lucide-react"
+import { Calendar, Download, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { AnalyticsChart } from "@/components/admin/analytics-chart"

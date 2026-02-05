@@ -21,7 +21,7 @@ interface AnalyticsChartProps {
   type: 'line' | 'bar' | 'pie'
   title: string
   description?: string
-  data: any[]
+  data: Record<string, string | number>[]
   dataKey: string
   categoryKey: string
   colors?: string[]
