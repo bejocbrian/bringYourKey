@@ -1,103 +1,62 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { VideoGenerationRequest } from '@/lib/types';
+import { GenerationRequest, Provider } from '@/lib/types';
 
 interface GenerationState {
-  generations: VideoGenerationRequest[];
-  activeGenerationId: string | null;
-  queue: VideoGenerationRequest[];
-  
-  addGeneration: (generation: VideoGenerationRequest) => void;
-  updateGeneration: (id: string, updates: Partial<VideoGenerationRequest>) => void;
+  generations: GenerationRequest[];
+  activeGenerations: string[];
+  addGeneration: (request: GenerationRequest) => void;
+  updateGeneration: (id: string, updates: Partial<GenerationRequest>) => void;
   removeGeneration: (id: string) => void;
-  setActiveGeneration: (id: string | null) => void;
-  addToQueue: (generation: VideoGenerationRequest) => void;
-  removeFromQueue: (id: string) => void;
-  processNextInQueue: () => void;
-  getGenerationsByProvider: (provider: string) => VideoGenerationRequest[];
-  getCompletedGenerations: () => VideoGenerationRequest[];
-  clearFailedGenerations: () => void;
-  resetAll: () => void;
+  getGenerationsByProvider: (provider: Provider) => GenerationRequest[];
 }
 
 export const useGenerationStore = create<GenerationState>()(
   persist(
     (set, get) => ({
       generations: [],
-      activeGenerationId: null,
-      queue: [],
+      activeGenerations: [],
 
-      addGeneration: (generation: VideoGenerationRequest) => {
+      addGeneration: (request) => {
         set((state) => ({
-          generations: [generation, ...state.generations],
+          generations: [request, ...state.generations],
+          activeGenerations: request.status === 'generating'
+            ? [...state.activeGenerations, request.id]
+            : state.activeGenerations,
         }));
       },
 
-      updateGeneration: (id: string, updates: Partial<VideoGenerationRequest>) => {
-        set((state) => ({
-          generations: state.generations.map(g =>
-            g.id === id ? { ...g, ...updates } : g
-          ),
-        }));
-      },
-
-      removeGeneration: (id: string) => {
-        set((state) => ({
-          generations: state.generations.filter(g => g.id !== id),
-          queue: state.queue.filter(g => g.id !== id),
-          activeGenerationId: state.activeGenerationId === id ? null : state.activeGenerationId,
-        }));
-      },
-
-      setActiveGeneration: (id: string | null) => {
-        set({ activeGenerationId: id });
-      },
-
-      addToQueue: (generation: VideoGenerationRequest) => {
-        set((state) => ({
-          queue: [...state.queue, generation],
-          generations: [generation, ...state.generations],
-        }));
-      },
-
-      removeFromQueue: (id: string) => {
-        set((state) => ({
-          queue: state.queue.filter(g => g.id !== id),
-        }));
-      },
-
-      processNextInQueue: () => {
-        const { queue, addToQueue, removeFromQueue } = get();
-        if (queue.length > 0) {
-          const next = queue[0];
-          removeFromQueue(next.id);
-        }
-      },
-
-      getGenerationsByProvider: (provider: string) => {
-        return get().generations.filter(g => g.provider === provider);
-      },
-
-      getCompletedGenerations: () => {
-        return get().generations.filter(g => g.status === 'completed');
-      },
-
-      clearFailedGenerations: () => {
-        set((state) => ({
-          generations: state.generations.filter(g => g.status !== 'failed'),
-        }));
-      },
-
-      resetAll: () => {
-        set({
-          generations: [],
-          activeGenerationId: null,
-          queue: [],
+      updateGeneration: (id, updates) => {
+        set((state) => {
+          const nextGenerations = state.generations.map((generation) =>
+            generation.id === id ? { ...generation, ...updates } : generation
+          );
+          const shouldBeActive = updates.status === 'generating';
+          const shouldRemoveActive = updates.status && updates.status !== 'generating';
+          return {
+            generations: nextGenerations,
+            activeGenerations: shouldBeActive
+              ? Array.from(new Set([...state.activeGenerations, id]))
+              : shouldRemoveActive
+              ? state.activeGenerations.filter((activeId) => activeId !== id)
+              : state.activeGenerations,
+          };
         });
+      },
+
+      removeGeneration: (id) => {
+        set((state) => ({
+          generations: state.generations.filter((generation) => generation.id !== id),
+          activeGenerations: state.activeGenerations.filter((activeId) => activeId !== id),
+        }));
+      },
+
+      getGenerationsByProvider: (provider) => {
+        return get().generations.filter((generation) => generation.provider === provider);
       },
     }),
     {
-      name: 'generation-storage',
+      name: 'byok-generations',
     }
   )
 );

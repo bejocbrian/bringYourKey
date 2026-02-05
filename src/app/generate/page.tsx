@@ -1,435 +1,320 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Video, Play, Film, Loader2, Download, Trash2, Clock, Settings2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
+import { Download, Loader2, Sparkles, Video } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PROVIDER_CONFIGS } from "@/lib/services/providers"
+import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useGenerationStore } from "@/lib/store/generation-store"
-import { VideoGenerationRequest, VideoProvider } from "@/lib/types"
-import { generateVideo, checkGenerationStatus } from "@/lib/services/providers"
+import { GenerationRequest, Provider } from "@/lib/types"
 import { useToast } from "@/components/hooks/use-toast"
 import { format } from "date-fns"
 
+const SAMPLE_VIDEOS: Record<Provider, string> = {
+  "google-veo": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+  "meta-moviegen": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+  "runway-gen3": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+}
+
 export default function GeneratePage() {
-  const { hasApiKey, getApiKey, updateUsage } = useApiKeysStore()
-  const { generations, addGeneration, updateGeneration, removeGeneration } = useGenerationStore()
+  const { hasKey, getDecryptedKey } = useApiKeysStore()
+  const { generations, addGeneration, updateGeneration, activeGenerations } = useGenerationStore()
   const { toast } = useToast()
 
-  const [prompt, setPrompt] = useState('')
-  const [selectedProvider, setSelectedProvider] = useState<VideoProvider>('google-veo')
+  const [prompt, setPrompt] = useState("")
+  const [selectedProvider, setSelectedProvider] = useState<Provider>("google-veo")
   const [duration, setDuration] = useState(4)
-  const [aspectRatio, setAspectRatio] = useState('16:9')
-  const [quality, setQuality] = useState('standard')
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16" | "1:1">("16:9")
   const [isGenerating, setIsGenerating] = useState(false)
-
-  const availableProviders = Object.values(PROVIDER_CONFIGS).filter(p => hasApiKey(p.id))
+  const timeouts = useRef<NodeJS.Timeout[]>([])
 
   useEffect(() => {
-    if (!hasApiKey(selectedProvider) && availableProviders.length > 0) {
-      setSelectedProvider(availableProviders[0].id as VideoProvider)
+    return () => {
+      timeouts.current.forEach((timeout) => clearTimeout(timeout))
     }
-  }, [availableProviders, selectedProvider, hasApiKey])
+  }, [])
 
-  const handleGenerate = async () => {
+  const promptLimit = 500
+  const providerConfig = PROVIDERS[selectedProvider]
+  const canGenerate = hasKey(selectedProvider)
+
+  useEffect(() => {
+    if (!providerConfig.supportedRatios.includes(aspectRatio)) {
+      setAspectRatio(providerConfig.supportedRatios[0])
+    }
+    if (duration > providerConfig.maxDuration) {
+      setDuration(providerConfig.maxDuration)
+    }
+  }, [providerConfig, aspectRatio, duration])
+
+  const handleGenerate = () => {
     if (!prompt.trim()) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Please enter a prompt",
+        title: "Prompt required",
+        description: "Tell us what you want to generate before starting.",
       })
       return
     }
 
-    const apiKey = getApiKey(selectedProvider)
+    const apiKey = getDecryptedKey(selectedProvider)
     if (!apiKey) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "No API key found for selected provider",
+        title: "No API key",
+        description: "Add an API key for the selected provider first.",
       })
       return
     }
 
-    setIsGenerating(true)
-    
-    const generation: VideoGenerationRequest = {
-      id: `gen-${Date.now()}`,
-      prompt,
+    const generationId = `gen-${Date.now()}`
+    const newGeneration: GenerationRequest = {
+      id: generationId,
       provider: selectedProvider,
-      settings: { duration, aspectRatio, quality },
-      status: 'pending',
-      progress: 0,
-      createdAt: new Date(),
+      prompt: prompt.trim(),
+      settings: {
+        duration,
+        aspectRatio,
+      },
+      status: "pending",
+      createdAt: new Date().toISOString(),
     }
 
-    addGeneration(generation)
+    addGeneration(newGeneration)
+    setIsGenerating(true)
 
-    try {
-      const result = await generateVideo(selectedProvider, prompt, apiKey, { duration, aspectRatio, quality })
-      
-      updateGeneration(generation.id, {
-        status: 'processing',
-        progress: 10,
-      })
+    const startTimeout = setTimeout(() => {
+      updateGeneration(generationId, { status: "generating" })
+    }, 600)
 
-      startPolling(generation.id, selectedProvider, result.generationId, apiKey)
-    } catch (error) {
-      updateGeneration(generation.id, {
-        status: 'failed',
-        errorMessage: error instanceof Error ? error.message : 'Failed to start generation',
-      })
-      updateUsage(selectedProvider, false, duration)
-      toast({
-        variant: "destructive",
-        title: "Generation Failed",
-        description: error.message || "Failed to start video generation",
+    const completeTimeout = setTimeout(() => {
+      updateGeneration(generationId, {
+        status: "completed",
+        resultUrl: SAMPLE_VIDEOS[selectedProvider],
       })
       setIsGenerating(false)
-    }
+      toast({
+        title: "Generation complete",
+        description: "Your video is ready to preview and download.",
+      })
+    }, 3200)
+
+    timeouts.current.push(startTimeout, completeTimeout)
   }
 
-  const startPolling = (generationId: string, provider: VideoProvider, apiGenerationId: string, apiKey: string) => {
-    setActivePolling(prev => new Set(prev).add(generationId))
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const result = await checkGenerationStatus(provider, apiGenerationId, apiKey)
-        
-        if (result.status === 'completed') {
-          updateGeneration(generationId, {
-            status: 'completed',
-            progress: 100,
-            videoUrl: result.videoUrl,
-            completedAt: new Date(),
-          })
-          updateUsage(provider, true, duration)
-          toast({
-            title: "Success",
-            description: "Video generation completed!",
-          })
-          clearInterval(pollInterval)
-          setActivePolling(prev => {
-            const newSet = new Set(prev)
-            newSet.delete(generationId)
-            return newSet
-          })
-          setIsGenerating(false)
-        } else if (result.status === 'failed') {
-          updateGeneration(generationId, {
-            status: 'failed',
-            errorMessage: result.error || 'Generation failed',
-          })
-          updateUsage(provider, false, duration)
-          toast({
-            variant: "destructive",
-            title: "Generation Failed",
-            description: result.error || "Video generation failed",
-          })
-          clearInterval(pollInterval)
-          setActivePolling(prev => {
-            const newSet = new Set(prev)
-            newSet.delete(generationId)
-            return newSet
-          })
-          setIsGenerating(false)
-        } else if (result.status === 'processing') {
-          updateGeneration(generationId, {
-            status: 'processing',
-            progress: 50,
-            videoUrl: result.videoUrl,
-          })
-        }
-      } catch (error) {
-        console.error('Polling error:', error)
-      }
-    }, 3000)
-  }
-
-  const handleDownload = async (generation: VideoGenerationRequest) => {
-    if (!generation.videoUrl) return
+  const handleDownload = async (generation: GenerationRequest) => {
+    if (!generation.resultUrl) return
 
     try {
-      const response = await fetch(generation.videoUrl)
+      const response = await fetch(generation.resultUrl)
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `video-${generation.id}.mp4`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = `video-${generation.id}.mp4`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
       window.URL.revokeObjectURL(url)
-      
       toast({
-        title: "Success",
-        description: "Video downloaded successfully",
+        title: "Downloaded",
+        description: "The video has been saved to your device.",
       })
     } catch {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to download video",
+        title: "Download failed",
+        description: "We couldn't download that video. Try again.",
       })
     }
   }
 
-  const handleDelete = (id: string) => {
-    removeGeneration(id)
-    toast({
-      title: "Deleted",
-      description: "Generation removed",
-    })
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'processing':
-        return <Loader2 className="h-4 w-4 animate-spin" />
-      case 'completed':
-        return <Video className="h-4 w-4 text-green-600" />
-      case 'failed':
-        return <Trash2 className="h-4 w-4 text-destructive" />
-      default:
-        return <Clock className="h-4 w-4 text-muted-foreground" />
-    }
-  }
+  const latestGeneration = generations[0]
 
   return (
     <div className="container mx-auto px-6 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Generate Videos</h1>
         <p className="text-muted-foreground">
-          Create AI videos using your connected API keys.
+          Select a provider, write a prompt, and generate with your own API keys. Generation calls are simulated in this MVP.
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Video Settings</CardTitle>
-              <CardDescription>
-                Configure your video generation parameters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Prompt & Settings</CardTitle>
+            <CardDescription>Configure your prompt and output settings.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <Label>Provider</Label>
+              <Select value={selectedProvider} onValueChange={(value) => setSelectedProvider(value as Provider)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PROVIDERS).map(([providerId, provider]) => (
+                    <SelectItem key={providerId} value={providerId}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!canGenerate && (
+                <p className="text-xs text-muted-foreground">
+                  No API key found. <Link className="text-primary hover:underline" href="/api-keys">Add a key</Link> to enable generation.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="prompt">Prompt</Label>
+                <span className="text-xs text-muted-foreground">{prompt.length}/{promptLimit}</span>
+              </div>
+              <textarea
+                id="prompt"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value.slice(0, promptLimit))}
+                placeholder="Describe the video you want to generate..."
+                className="flex min-h-[140px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="provider">Provider</Label>
-                <Select value={selectedProvider} onValueChange={(v) => setSelectedProvider(v as VideoProvider)} disabled={availableProviders.length === 0}>
+                <Label>Duration</Label>
+                <Select value={duration.toString()} onValueChange={(value) => setDuration(Number(value))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a provider" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableProviders.map(provider => (
-                      <SelectItem key={provider.id} value={provider.id}>
-                        <div className="flex items-center gap-2">
-                          {provider.icon === 'Video' && <Video className="h-4 w-4" />}
-                          {provider.icon === 'Film' && <Film className="h-4 w-4" />}
-                          {provider.icon === 'Play' && <Play className="h-4 w-4" />}
-                          {provider.name}
-                        </div>
+                    {Array.from({ length: providerConfig.maxDuration }, (_, index) => index + 1).map((value) => (
+                      <SelectItem key={value} value={value.toString()}>
+                        {value} second{value > 1 ? "s" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {availableProviders.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    No API keys configured. <a href="/api-keys" className="text-primary hover:underline">Add API keys</a>
-                  </p>
-                )}
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="prompt">Prompt</Label>
-                <textarea
-                  id="prompt"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe the video you want to generate..."
-                  className="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                  disabled={isGenerating}
-                />
+                <Label>Aspect Ratio</Label>
+                <Select value={aspectRatio} onValueChange={(value) => setAspectRatio(value as "16:9" | "9:16" | "1:1")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providerConfig.supportedRatios.map((ratio) => (
+                      <SelectItem key={ratio} value={ratio}>
+                        {ratio}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
 
-              <Tabs defaultValue="basic">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="basic">Basic</TabsTrigger>
-                  <TabsTrigger value="advanced">Advanced</TabsTrigger>
-                </TabsList>
-                <TabsContent value="basic" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Duration</Label>
-                    <Select value={duration.toString()} onValueChange={(v) => setDuration(parseInt(v))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedProvider && Array.from({ length: PROVIDER_CONFIGS[selectedProvider]?.maxDuration || 4 }, (_, i) => i + 1).map(d => (
-                          <SelectItem key={d} value={d.toString()}>{d} second{d > 1 ? 's' : ''}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+            <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Cost warning</p>
+              <p className="mt-1">
+                API usage is billed directly by the provider. This MVP simulates generation, but costs will apply once live.
+              </p>
+            </div>
 
-                  <div className="space-y-2">
-                    <Label>Aspect Ratio</Label>
-                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
-                        <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
-                        <SelectItem value="1:1">1:1 (Square)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="advanced" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Quality</Label>
-                    <Select value={quality} onValueChange={setQuality}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="rounded-lg border bg-muted/50 p-4">
-                    <div className="flex items-start gap-2">
-                      <Settings2 className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                      <div className="text-sm">
-                        <p className="font-medium">Provider-specific settings</p>
-                        <p className="text-muted-foreground mt-1">
-                          Additional settings vary by provider and may be added in future updates.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <Button 
-                onClick={handleGenerate} 
-                disabled={isGenerating || !prompt.trim() || availableProviders.length === 0}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Video className="mr-2 h-4 w-4" />
-                    Generate Video
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Generation Queue</CardTitle>
-              <CardDescription>
-                Track your video generations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {generations.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Video className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No generations yet</p>
-                    <p className="text-sm mt-1">Start by creating your first video</p>
-                  </div>
-                ) : (
-                  generations.slice(0, 5).map(generation => (
-                    <div key={generation.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(generation.status)}
-                          <span className="text-sm font-medium capitalize">{generation.status}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(generation.id)}
-                          className="h-8 w-8"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <p className="text-sm line-clamp-2">{generation.prompt}</p>
-
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{PROVIDER_CONFIGS[generation.provider]?.name}</span>
-                        <span>•</span>
-                        <span>{format(new Date(generation.createdAt), 'MMM d, HH:mm')}</span>
-                      </div>
-
-                      {generation.status === 'processing' && (
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{ width: `${generation.progress}%` }}
-                          />
-                        </div>
-                      )}
-
-                      {generation.status === 'completed' && generation.videoUrl && (
-                        <div className="space-y-2">
-                          <video
-                            src={generation.videoUrl}
-                            controls
-                            className="w-full rounded-lg bg-black"
-                          />
-                          <Button
-                            onClick={() => handleDownload(generation)}
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Video
-                          </Button>
-                        </div>
-                      )}
-
-                      {generation.status === 'failed' && (
-                        <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">
-                          {generation.errorMessage}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {generations.length > 5 && (
-                <div className="pt-4 border-t">
-                  <Button variant="outline" className="w-full" asChild>
-                    <a href="/gallery">View All Generations</a>
-                  </Button>
-                </div>
+            <Button className="w-full" onClick={handleGenerate} disabled={!canGenerate || isGenerating}>
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate Video
+                </>
               )}
-            </CardContent>
-          </Card>
-        </div>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Generation Status</CardTitle>
+            <CardDescription>Track progress and view results.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {latestGeneration ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{PROVIDERS[latestGeneration.provider].name}</p>
+                    <span className="text-xs rounded-full border px-2 py-1 capitalize">
+                      {latestGeneration.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                    {latestGeneration.prompt}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {latestGeneration.settings.duration}s • {latestGeneration.settings.aspectRatio} • {format(new Date(latestGeneration.createdAt), "MMM d, HH:mm")}
+                  </p>
+                </div>
+
+                {latestGeneration.status === "generating" && (
+                  <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating video...
+                    </div>
+                    <div className="mt-3 h-2 w-full rounded-full bg-muted">
+                      <div className="h-2 w-1/2 rounded-full bg-primary animate-pulse" />
+                    </div>
+                  </div>
+                )}
+
+                {latestGeneration.status === "completed" && latestGeneration.resultUrl && (
+                  <div className="space-y-3">
+                    <video
+                      src={latestGeneration.resultUrl}
+                      controls
+                      className="w-full rounded-lg bg-black"
+                    />
+                    <Button variant="outline" onClick={() => handleDownload(latestGeneration)}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Video
+                    </Button>
+                  </div>
+                )}
+
+                {latestGeneration.status === "failed" && (
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                    {latestGeneration.error ?? "Generation failed. Please try again."}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-16 text-muted-foreground">
+                <Video className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No generations yet.</p>
+                <p className="text-sm mt-1">Start your first video to see status updates here.</p>
+              </div>
+            )}
+
+            {activeGenerations.length > 1 && (
+              <div className="rounded-lg border p-4">
+                <p className="text-sm font-medium">Active generations</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {activeGenerations.length} videos are currently generating.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

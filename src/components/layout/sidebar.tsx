@@ -2,27 +2,31 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Video, Key, Images, Settings } from "lucide-react"
+import { LayoutDashboard, Video, Images, Key } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PROVIDERS } from "@/lib/services/providers"
+import { useApiKeysStore } from "@/lib/store/api-keys-store"
+import { Provider } from "@/lib/types"
 
 const navigation = [
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Generate", href: "/generate", icon: Video },
   { name: "Gallery", href: "/gallery", icon: Images },
   { name: "API Keys", href: "/api-keys", icon: Key },
-  { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { hasKey } = useApiKeysStore()
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card">
+    <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r bg-card lg:block">
       <div className="flex h-full flex-col">
         <div className="flex h-16 items-center border-b px-6">
           <Video className="h-6 w-6 text-primary" />
-          <span className="ml-2 text-lg font-semibold">BYOK Video</span>
+          <span className="ml-2 text-lg font-semibold">BYOK</span>
         </div>
-        
+
         <nav className="flex-1 space-y-1 p-4">
           {navigation.map((item) => {
             const isActive = pathname === item.href
@@ -45,11 +49,19 @@ export function Sidebar() {
         </nav>
 
         <div className="border-t p-4">
-          <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-            <p className="font-medium">BYOK - Bring Your Own Key</p>
-            <p className="mt-1">
-              Add your API keys from different providers to generate videos.
-            </p>
+          <div className="rounded-lg bg-muted p-3">
+            <p className="text-xs font-semibold text-muted-foreground">Provider Status</p>
+            <div className="mt-3 space-y-2">
+              {Object.entries(PROVIDERS).map(([id, provider]) => (
+                <div key={id} className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{provider.name}</span>
+                  <span className={cn(
+                    "h-2 w-2 rounded-full",
+                    hasKey(id as Provider) ? "bg-emerald-500" : "bg-muted-foreground/40"
+                  )} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
