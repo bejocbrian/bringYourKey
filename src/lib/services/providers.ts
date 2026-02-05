@@ -6,13 +6,15 @@ export const PROVIDERS: Record<Provider, {
   docsUrl: string;
   maxDuration: number;
   supportedRatios: Array<'16:9' | '9:16' | '1:1'>;
+  supportedDurations?: number[];
 }> = {
   'google-veo': {
-    name: 'Google Veo 2',
-    description: "Google's most capable video generation model",
-    docsUrl: 'https://ai.google.dev/',
+    name: 'Google Veo 3.1 Fast',
+    description: "Google's Veo fast video generation model",
+    docsUrl: 'https://cloud.google.com/vertex-ai/docs/generative-ai/video/overview',
     maxDuration: 8,
     supportedRatios: ['16:9', '9:16', '1:1'],
+    supportedDurations: [4, 6, 8],
   },
   'meta-moviegen': {
     name: 'Meta Movie Gen',

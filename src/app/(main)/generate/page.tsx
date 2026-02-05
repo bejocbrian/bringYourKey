@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Download, Loader2, Sparkles, Video, Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { generateVideo } from "@/lib/providers"
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useGenerationStore } from "@/lib/store/generation-store"
@@ -14,12 +15,6 @@ import { useAdminStore } from "@/lib/store/admin-store"
 import { GenerationRequest, Provider } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
-
-const SAMPLE_VIDEOS: Record<Provider, string> = {
-  "google-veo": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-  "meta-moviegen": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  "runway-gen3": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-}
 
 export default function GeneratePage() {
   const { hasKey, getDecryptedKey } = useApiKeysStore()
@@ -32,19 +27,16 @@ export default function GeneratePage() {
   const [duration, setDuration] = useState(4)
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16" | "1:1">("16:9")
   const [isGenerating, setIsGenerating] = useState(false)
-  const timeouts = useRef<NodeJS.Timeout[]>([])
 
   const currentUser = users.find(u => u.id === currentUserId)
   const allowedProviders = currentUser?.allowedProviders ?? []
 
-  useEffect(() => {
-    return () => {
-      timeouts.current.forEach((timeout) => clearTimeout(timeout))
-    }
-  }, [])
-
   const promptLimit = 500
   const providerConfig = PROVIDERS[selectedProvider]
+  const durationOptions = useMemo(
+    () => providerConfig.supportedDurations ?? Array.from({ length: providerConfig.maxDuration }, (_, index) => index + 1),
+    [providerConfig]
+  )
   const hasApiKey = hasKey(selectedProvider)
   const isProviderAllowed = isProviderAllowedForUser(currentUserId, selectedProvider)
   const canGenerate = hasApiKey && isProviderAllowed
@@ -53,12 +45,12 @@ export default function GeneratePage() {
     if (!providerConfig.supportedRatios.includes(aspectRatio)) {
       setAspectRatio(providerConfig.supportedRatios[0])
     }
-    if (duration > providerConfig.maxDuration) {
-      setDuration(providerConfig.maxDuration)
+    if (!durationOptions.includes(duration)) {
+      setDuration(durationOptions[0])
     }
-  }, [providerConfig, aspectRatio, duration])
+  }, [providerConfig, aspectRatio, duration, durationOptions])
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast({
         variant: "destructive",
@@ -101,25 +93,42 @@ export default function GeneratePage() {
     }
 
     addGeneration(newGeneration)
+    updateGeneration(generationId, { status: "generating" })
     setIsGenerating(true)
 
-    const startTimeout = setTimeout(() => {
-      updateGeneration(generationId, { status: "generating" })
-    }, 600)
+    try {
+      const result = await generateVideo({
+        provider: selectedProvider,
+        prompt: prompt.trim(),
+        settings: {
+          duration,
+          aspectRatio,
+        },
+        accessToken: apiKey,
+      })
 
-    const completeTimeout = setTimeout(() => {
       updateGeneration(generationId, {
         status: "completed",
-        resultUrl: SAMPLE_VIDEOS[selectedProvider],
+        resultUrl: result.resultUrl,
       })
-      setIsGenerating(false)
       toast({
         title: "Generation complete",
         description: "Your video is ready to preview and download.",
       })
-    }, 3200)
-
-    timeouts.current.push(startTimeout, completeTimeout)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Generation failed. Please try again."
+      updateGeneration(generationId, {
+        status: "failed",
+        error: message,
+      })
+      toast({
+        variant: "destructive",
+        title: "Generation failed",
+        description: message,
+      })
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleDownload = async (generation: GenerationRequest) => {
@@ -156,7 +165,7 @@ export default function GeneratePage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Generate Videos</h1>
         <p className="text-muted-foreground">
-          Select a provider, write a prompt, and generate with your own API keys. Generation calls are simulated in this MVP.
+          Select a provider, write a prompt, and generate with your own API keys.
         </p>
       </div>
 
@@ -227,7 +236,7 @@ export default function GeneratePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: providerConfig.maxDuration }, (_, index) => index + 1).map((value) => (
+                    {durationOptions.map((value) => (
                       <SelectItem key={value} value={value.toString()}>
                         {value} second{value > 1 ? "s" : ""}
                       </SelectItem>
@@ -255,7 +264,7 @@ export default function GeneratePage() {
             <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Cost warning</p>
               <p className="mt-1">
-                API usage is billed directly by the provider. This MVP simulates generation, but costs will apply once live.
+                API usage is billed directly by the provider. Generations run against your BYOK access tokens.
               </p>
             </div>
 
@@ -298,11 +307,11 @@ export default function GeneratePage() {
                   </p>
                 </div>
 
-                {latestGeneration.status === "generating" && (
+                {(latestGeneration.status === "generating" || latestGeneration.status === "pending") && (
                   <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Generating video...
+                      {latestGeneration.status === "pending" ? "Preparing request..." : "Generating video..."}
                     </div>
                     <div className="mt-3 h-2 w-full rounded-full bg-muted">
                       <div className="h-2 w-1/2 rounded-full bg-primary animate-pulse" />
