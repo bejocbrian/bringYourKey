@@ -90,5 +90,5 @@ export interface AnalyticsData {
   topPrompts: {
     words: string[];
     count: number;
-  }[];
+  };
 }

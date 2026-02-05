@@ -1,12 +1,10 @@
 "use client"
 
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Settings2, 
-  Clock, 
-  DollarSign, 
-  Maximize 
+import {
+  CheckCircle2,
+  Settings2,
+  Clock,
+  DollarSign
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"

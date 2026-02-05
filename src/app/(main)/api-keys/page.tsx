@@ -13,7 +13,7 @@ import { Provider } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ApiKeysPage() {
-  const { apiKeys, addKey, removeKey, getDecryptedKey, hasKey } = useApiKeysStore()
+  const { apiKeys, addKey, removeKey, getDecryptedKey } = useApiKeysStore()
   const { toast } = useToast()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeProvider, setActiveProvider] = useState<Provider>("google-veo")
