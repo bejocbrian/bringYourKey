@@ -19,8 +19,6 @@ export default function AnalyticsPage() {
     }, 1000)
   }
 
-  const hasGenerationsData = analytics.generations.length > 0
-  const hasProviderData = analytics.providerUsage.length > 0
   const hasPromptData = analytics.topPrompts.words.length > 0
 
   const successCount = analytics.generations.filter(g => g.status === 'success').reduce((sum, g) => sum + g.count, 0)
