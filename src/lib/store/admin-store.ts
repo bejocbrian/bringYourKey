@@ -9,6 +9,7 @@ import {
   Provider,
   User
 } from '@/lib/types';
+import { PROVIDERS } from '@/lib/services/providers';
 
 interface AdminState {
   // Auth
@@ -44,6 +45,19 @@ interface AdminState {
   isProviderAllowedForUser: (userId: string, provider: Provider) => boolean;
 }
 
+const createProviderFeatures = (): FeatureFlag[] => {
+  const now = new Date().toISOString();
+  return Object.entries(PROVIDERS).map(([id, provider]) => ({
+    id: `provider-${id}`,
+    name: provider.name,
+    description: `Enable ${provider.name} API for video generation`,
+    enabled: true,
+    category: 'provider' as const,
+    createdAt: now,
+    updatedAt: now,
+  }));
+};
+
 const defaultFeatures: FeatureFlag[] = [
   {
     id: 'video-generation',
@@ -71,7 +85,8 @@ const defaultFeatures: FeatureFlag[] = [
     category: 'experimental',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  }
+  },
+  ...createProviderFeatures()
 ];
 
 const defaultProviderConfigs: Record<Provider, ProviderConfig> = {
@@ -118,72 +133,16 @@ const defaultSettings: AppSettings = {
   }
 };
 
-const mockAnalytics: AnalyticsData = {
-  generations: [
-    { date: '2023-10-01', count: 12, provider: 'google-veo', status: 'success' },
-    { date: '2023-10-02', count: 15, provider: 'google-veo', status: 'success' },
-    { date: '2023-10-03', count: 8, provider: 'meta-moviegen', status: 'success' },
-    { date: '2023-10-04', count: 20, provider: 'runway-gen3', status: 'success' },
-    { date: '2023-10-05', count: 5, provider: 'google-veo', status: 'failed' },
-  ],
-  providerUsage: [
-    { provider: 'google-veo', count: 450, percentage: 45 },
-    { provider: 'meta-moviegen', count: 300, percentage: 30 },
-    { provider: 'runway-gen3', count: 250, percentage: 25 },
-  ],
+const emptyAnalytics: AnalyticsData = {
+  generations: [],
+  providerUsage: [],
   topPrompts: {
-    words: ['cinematic', 'futuristic', 'landscape', 'cyberpunk', 'neon'],
-    count: 150
+    words: [],
+    count: 0
   }
 };
 
-const defaultUsers: User[] = [
-  {
-    id: 'user-1',
-    name: 'Alex Johnson',
-    email: 'alex@example.com',
-    status: 'active',
-    allowedProviders: ['google-veo', 'meta-moviegen', 'runway-gen3'],
-    lastActive: new Date().toISOString(),
-    generationsCount: 124
-  },
-  {
-    id: 'user-2',
-    name: 'Sarah Chen',
-    email: 'sarah@example.com',
-    status: 'active',
-    allowedProviders: ['google-veo', 'meta-moviegen'],
-    lastActive: new Date(Date.now() - 86400000).toISOString(),
-    generationsCount: 89
-  },
-  {
-    id: 'user-3',
-    name: 'Mike Williams',
-    email: 'mike@example.com',
-    status: 'active',
-    allowedProviders: ['google-veo'],
-    lastActive: new Date(Date.now() - 172800000).toISOString(),
-    generationsCount: 45
-  },
-  {
-    id: 'user-4',
-    name: 'Emily Davis',
-    email: 'emily@example.com',
-    status: 'inactive',
-    allowedProviders: ['google-veo', 'meta-moviegen', 'runway-gen3'],
-    lastActive: new Date(Date.now() - 604800000).toISOString(),
-    generationsCount: 12
-  },
-  {
-    id: 'user-5',
-    name: 'David Brown',
-    email: 'david@example.com',
-    status: 'suspended',
-    allowedProviders: [],
-    lastActive: new Date(Date.now() - 2592000000).toISOString(),
-    generationsCount: 0
-  }
-];
+const emptyUsers: User[] = [];
 
 export const useAdminStore = create<AdminState>()(
   persist(
@@ -193,9 +152,9 @@ export const useAdminStore = create<AdminState>()(
       features: defaultFeatures,
       providerConfigs: defaultProviderConfigs,
       settings: defaultSettings,
-      analytics: mockAnalytics,
-      users: defaultUsers,
-      currentUserId: defaultUsers[0].id,
+      analytics: emptyAnalytics,
+      users: emptyUsers,
+      currentUserId: '',
 
       login: (username, password) => {
         // Simple password-based auth for MVP
@@ -214,11 +173,30 @@ export const useAdminStore = create<AdminState>()(
 
       logout: () => set({ isAuthenticated: false, adminUser: null }),
 
-      toggleFeature: (id) => set((state) => ({
-        features: state.features.map(f => 
-          f.id === id ? { ...f, enabled: !f.enabled, updatedAt: new Date().toISOString() } : f
-        )
-      })),
+      toggleFeature: (id) => set((state) => {
+        // If this is a provider feature flag, also sync the provider config
+        if (id.startsWith('provider-')) {
+          const providerId = id.replace('provider-', '') as Provider;
+          const currentEnabled = state.providerConfigs[providerId]?.enabled ?? true;
+          return {
+            features: state.features.map(f =>
+              f.id === id ? { ...f, enabled: !f.enabled, updatedAt: new Date().toISOString() } : f
+            ),
+            providerConfigs: {
+              ...state.providerConfigs,
+              [providerId]: {
+                ...state.providerConfigs[providerId],
+                enabled: !currentEnabled
+              }
+            }
+          };
+        }
+        return {
+          features: state.features.map(f =>
+            f.id === id ? { ...f, enabled: !f.enabled, updatedAt: new Date().toISOString() } : f
+          )
+        };
+      }),
 
       isFeatureEnabled: (id) => {
         const feature = get().features.find(f => f.id === id);
@@ -232,22 +210,29 @@ export const useAdminStore = create<AdminState>()(
         }
       })),
 
-      toggleProvider: (provider) => set((state) => ({
-        providerConfigs: {
-          ...state.providerConfigs,
-          [provider]: { 
-            ...state.providerConfigs[provider], 
-            enabled: !state.providerConfigs[provider].enabled 
-          }
-        }
-      })),
+      toggleProvider: (provider) => set((state) => {
+        const newEnabled = !state.providerConfigs[provider].enabled;
+        const featureId = `provider-${provider}`;
+        return {
+          providerConfigs: {
+            ...state.providerConfigs,
+            [provider]: {
+              ...state.providerConfigs[provider],
+              enabled: newEnabled
+            }
+          },
+          features: state.features.map(f =>
+            f.id === featureId ? { ...f, enabled: newEnabled, updatedAt: new Date().toISOString() } : f
+          )
+        };
+      }),
 
       updateSettings: (settings) => set((state) => ({
         settings: { ...state.settings, ...settings }
       })),
 
       refreshAnalytics: () => {
-        set({ analytics: mockAnalytics });
+        set({ analytics: emptyAnalytics });
       },
 
       setCurrentUser: (userId) => {

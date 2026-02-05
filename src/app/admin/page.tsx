@@ -16,7 +16,9 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { useAdminStore } from "@/lib/store/admin-store"
 
 export default function AdminDashboard() {
-  const { analytics } = useAdminStore()
+  const { analytics, users } = useAdminStore()
+
+  const hasData = analytics.generations.length > 0 || analytics.providerUsage.length > 0
 
   return (
     <div className="space-y-8">
@@ -38,28 +40,25 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard 
           title="Total Users" 
-          value="1,248" 
+          value={users.length.toString()} 
           icon={Users} 
-          trend={{ value: 12, label: "vs last month", isUp: true }}
           color="blue"
         />
         <StatsCard 
           title="Generations" 
-          value="45,672" 
+          value={analytics.generations.reduce((sum, g) => sum + g.count, 0).toString()} 
           icon={Video} 
-          trend={{ value: 8, label: "vs last month", isUp: true }}
           color="emerald"
         />
         <StatsCard 
-          title="Active Keys" 
-          value="892" 
+          title="Active Providers" 
+          value={analytics.providerUsage.length.toString()} 
           icon={Key} 
-          trend={{ value: 3, label: "vs last month", isUp: false }}
           color="amber"
         />
         <StatsCard 
           title="Avg. Cost" 
-          value="$0.12" 
+          value="—" 
           icon={Zap} 
           description="per generation"
           color="rose"
@@ -102,24 +101,34 @@ export default function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
-                      <UserIcon className="h-4 w-4 text-slate-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">User_{i * 123} generated a video</p>
-                      <p className="text-xs text-slate-500">Google Veo • 2 minutes ago</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon">
-                    <ArrowUpRight className="h-4 w-4" />
-                  </Button>
+            {!hasData ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                  <Activity className="h-6 w-6 text-slate-400" />
                 </div>
-              ))}
-            </div>
+                <p className="text-sm text-slate-500">No activity yet</p>
+                <p className="text-xs text-slate-400 mt-1">Recent generations will appear here</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
+                        <UserIcon className="h-4 w-4 text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">User_{i * 123} generated a video</p>
+                        <p className="text-xs text-slate-500">Google Veo • 2 minutes ago</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon">
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -129,21 +138,33 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg">Popular Prompt Keywords</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {analytics.topPrompts.words.map((word) => (
-                <span 
-                  key={word} 
-                  className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium border border-indigo-100"
-                >
-                  {word}
-                </span>
-              ))}
-            </div>
-            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
-              <p className="text-sm text-slate-600">
-                <span className="font-bold text-slate-900">{analytics.topPrompts.count}</span> unique prompt combinations analyzed this week.
-              </p>
-            </div>
+            {analytics.topPrompts.words.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                  <Video className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="text-sm text-slate-500">No data yet</p>
+                <p className="text-xs text-slate-400 mt-1">Popular prompt keywords will appear here</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {analytics.topPrompts.words.map((word) => (
+                    <span 
+                      key={word} 
+                      className="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium border border-indigo-100"
+                    >
+                      {word}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                  <p className="text-sm text-slate-600">
+                    <span className="font-bold text-slate-900">{analytics.topPrompts.count}</span> unique prompt combinations analyzed this week.
+                  </p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
