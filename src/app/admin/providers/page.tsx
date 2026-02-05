@@ -41,36 +41,6 @@ export default function ProvidersPage() {
           </CardContent>
         </Card>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-slate-500">Total API Cost</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">$1,240.50</p>
-            <p className="text-xs text-slate-500 mt-1">Estimated for current billing period</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-slate-500">Avg Latency</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">4.2s</p>
-            <p className="text-xs text-slate-500 mt-1">Across all providers</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-slate-500">Success Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-emerald-600">99.2%</p>
-            <p className="text-xs text-slate-500 mt-1">+0.4% from last week</p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

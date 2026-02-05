@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Calendar, Download, RefreshCw } from "lucide-react"
+import { Calendar, Download, RefreshCw, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { AnalyticsChart } from "@/components/admin/analytics-chart"
@@ -18,6 +18,13 @@ export default function AnalyticsPage() {
       setIsRefreshing(false)
     }, 1000)
   }
+
+  const hasGenerationsData = analytics.generations.length > 0
+  const hasProviderData = analytics.providerUsage.length > 0
+  const hasPromptData = analytics.topPrompts.words.length > 0
+
+  const successCount = analytics.generations.filter(g => g.status === 'success').reduce((sum, g) => sum + g.count, 0)
+  const failedCount = analytics.generations.filter(g => g.status === 'failed').reduce((sum, g) => sum + g.count, 0)
 
   return (
     <div className="space-y-8">
@@ -58,8 +65,8 @@ export default function AnalyticsPage() {
             title="Success vs Failed"
             description="Generation status breakdown"
             data={[
-              { name: 'Success', value: 942 },
-              { name: 'Failed', value: 23 },
+              { name: 'Success', value: successCount },
+              { name: 'Failed', value: failedCount },
             ]}
             categoryKey="name"
             dataKey="value"
@@ -86,22 +93,32 @@ export default function AnalyticsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
-              {analytics.topPrompts.words.map((word, i) => (
-                <div key={word} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-slate-700">{word}</span>
-                    <span className="text-slate-500">{100 - i * 15}% frequency</span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-indigo-500 h-full rounded-full" 
-                      style={{ width: `${100 - i * 15}%` }}
-                    />
-                  </div>
+            {!hasPromptData ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                  <BarChart3 className="h-6 w-6 text-slate-400" />
                 </div>
-              ))}
-            </div>
+                <p className="text-sm text-slate-500">No data yet</p>
+                <p className="text-xs text-slate-400 mt-1">Prompt analysis will appear here as data is collected</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {analytics.topPrompts.words.map((word, i) => (
+                  <div key={word} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-700">{word}</span>
+                      <span className="text-slate-500">{100 - i * 15}% frequency</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-indigo-500 h-full rounded-full" 
+                        style={{ width: `${100 - i * 15}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
