@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { Provider } from "@/lib/types"
-import { useToast } from "@/components/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ApiKeysPage() {
   const { apiKeys, addKey, removeKey, getDecryptedKey, hasKey } = useApiKeysStore()

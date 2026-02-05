@@ -15,7 +15,7 @@ const navigation = [
   { name: "API Keys", href: "/api-keys", icon: Key },
 ]
 
-export function Sidebar() {
+export function MainSidebar() {
   const pathname = usePathname()
   const { hasKey } = useApiKeysStore()
 
