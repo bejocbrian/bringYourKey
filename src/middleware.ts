@@ -1,36 +1,57 @@
-import { auth } from "@/lib/auth/nextauth"
-import { NextResponse } from "next/server"
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
-export default auth((req) => {
+export async function middleware(req: NextRequest) {
   const { nextUrl } = req
-  const isAuthenticated = !!req.auth
+  const { user, emailVerified, supabaseResponse } = await updateSession(req)
 
   // Public routes that don't require authentication
-  const publicRoutes = ["/login", "/admin", "/admin/**", "/api/auth/**"]
+  const publicRoutes = ['/login', '/signup', '/verify', '/admin']
   
   // Check if the current route is public
   const isPublicRoute = publicRoutes.some(route => {
-    if (route.endsWith("/**")) {
-      const baseRoute = route.slice(0, -2)
-      return nextUrl.pathname.startsWith(baseRoute)
+    if (route === '/admin') {
+      return nextUrl.pathname.startsWith('/admin')
     }
     return nextUrl.pathname === route
   })
 
+  // Allow access to static files and API routes
+  if (
+    nextUrl.pathname.startsWith('/_next') ||
+    nextUrl.pathname.startsWith('/api') ||
+    nextUrl.pathname.includes('.') // static files
+  ) {
+    return supabaseResponse
+  }
+
   // If the route is not public and user is not authenticated, redirect to login
-  if (!isPublicRoute && !isAuthenticated) {
-    const loginUrl = new URL("/login", nextUrl.origin)
-    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname)
+  if (!isPublicRoute && !user) {
+    const loginUrl = new URL('/login', nextUrl.origin)
+    loginUrl.searchParams.set('redirect', nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // If user is authenticated and trying to access login page, redirect to home
-  if (isAuthenticated && nextUrl.pathname === "/login") {
-    return NextResponse.redirect(new URL("/", nextUrl.origin))
+  // If user is authenticated but email is not verified, redirect to verify page
+  // (except if already on verify page or logging out)
+  if (user && !emailVerified && !isPublicRoute && nextUrl.pathname !== '/verify') {
+    const verifyUrl = new URL('/verify', nextUrl.origin)
+    return NextResponse.redirect(verifyUrl)
   }
 
-  return NextResponse.next()
-})
+  // If user is authenticated and verified and trying to access auth pages, redirect to home
+  if (user && emailVerified && (nextUrl.pathname === '/login' || nextUrl.pathname === '/signup')) {
+    return NextResponse.redirect(new URL('/', nextUrl.origin))
+  }
+
+  // If user is authenticated but not verified and trying to access login/signup, redirect to verify
+  if (user && !emailVerified && (nextUrl.pathname === '/login' || nextUrl.pathname === '/signup')) {
+    return NextResponse.redirect(new URL('/verify', nextUrl.origin))
+  }
+
+  return supabaseResponse
+}
 
 export const config = {
   matcher: [
@@ -41,6 +62,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files (public folder)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public|api/auth).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|public).*)',
   ],
 }
