@@ -1,13 +1,14 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { type NextRequest, NextResponse } from "next/server"
+import { updateSession } from "@/lib/supabase/middleware"
 
-export async function middleware(req: NextRequest) {
-  const { nextUrl } = req
-  const { user, emailVerified, supabaseResponse } = await updateSession(req)
+export async function middleware(request: NextRequest) {
+  const { supabaseResponse, user } = await updateSession(request)
+
+  const { nextUrl } = request
+  const isAuthenticated = !!user
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/signup', '/verify', '/admin']
+  const publicRoutes = ["/login", "/signup", "/verify", "/admin", "/admin/**"]
   
   // Check if the current route is public
   const isPublicRoute = publicRoutes.some(route => {
@@ -33,21 +34,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // If user is authenticated but email is not verified, redirect to verify page
-  // (except if already on verify page or logging out)
-  if (user && !emailVerified && !isPublicRoute && nextUrl.pathname !== '/verify') {
-    const verifyUrl = new URL('/verify', nextUrl.origin)
-    return NextResponse.redirect(verifyUrl)
-  }
-
-  // If user is authenticated and verified and trying to access auth pages, redirect to home
-  if (user && emailVerified && (nextUrl.pathname === '/login' || nextUrl.pathname === '/signup')) {
-    return NextResponse.redirect(new URL('/', nextUrl.origin))
-  }
-
-  // If user is authenticated but not verified and trying to access login/signup, redirect to verify
-  if (user && !emailVerified && (nextUrl.pathname === '/login' || nextUrl.pathname === '/signup')) {
-    return NextResponse.redirect(new URL('/verify', nextUrl.origin))
+  // If user is authenticated and trying to access login/signup page, redirect to home
+  if (isAuthenticated && (nextUrl.pathname === "/login" || nextUrl.pathname === "/signup")) {
+    return NextResponse.redirect(new URL("/", nextUrl.origin))
   }
 
   return supabaseResponse
@@ -62,6 +51,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files (public folder)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
   ],
 }

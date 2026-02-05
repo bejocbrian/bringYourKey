@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Video, Mail, Lock } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { Video, Loader2 } from "lucide-react"
+import { isDisposableEmail } from "@/lib/auth/disposable-domains"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -18,37 +19,58 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get("redirect") || "/"
+  const callbackUrl = searchParams.get("callbackUrl") || "/"
   const supabase = createClient()
+
+  useEffect(() => {
+    // Check if user is already authenticated
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.push(callbackUrl)
+      }
+    }
+    checkSession()
+  }, [router, callbackUrl, supabase])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    // Validate email
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid email address")
+      return
+    }
+
+    // Check for disposable email
+    if (isDisposableEmail(email)) {
+      setError("Disposable email addresses are not allowed. Please use a permanent email address.")
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (loginError) {
-        setError(loginError.message)
-        setIsLoading(false)
+      if (signInError) {
+        setError(signInError.message)
         return
       }
 
-      if (data.user) {
-        // Check if email is verified
-        if (!data.user.email_confirmed_at) {
-          router.push('/verify')
-          return
-        }
-
-        // Redirect to the original page or home
-        router.push(redirect)
-        router.refresh()
+      if (data.user && !data.user.email_confirmed_at) {
+        // Email not verified
+        router.push(`/verify?email=${encodeURIComponent(email)}`)
+        return
       }
+
+      // Successful login
+      router.push(callbackUrl)
+      router.refresh()
     } catch (err) {
       console.error("Login error:", err)
       setError("An unexpected error occurred. Please try again.")
@@ -75,56 +97,58 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-
+            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="pl-9"
-                  autoComplete="email"
-                />
-              </div>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                required
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pl-9"
-                  autoComplete="current-password"
-                />
-              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+              />
             </div>
-
+            
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full"
               size="lg"
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </Button>
-
-            <div className="text-center text-sm space-y-2">
-              <p className="text-muted-foreground">
+            
+            <div className="text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
-                <Link href="/signup" className="text-primary hover:underline font-medium">
+                <Link href="/signup" className="text-primary hover:underline">
                   Sign up
                 </Link>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Disposable email addresses are not allowed.
               </p>
             </div>
           </form>

@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { LayoutDashboard, Video, Images, Key, Lock, LogOut, User } from "lucide-react"
+import { useState, useEffect } from "react"
+import { User } from "@supabase/supabase-js"
+import { LayoutDashboard, Video, Images, Key, Lock, LogOut, User as UserIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -12,7 +13,6 @@ import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useAdminStore } from "@/lib/store/admin-store"
 import { Provider } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -24,29 +24,33 @@ const navigation = [
 export function MainSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const { hasKey } = useApiKeysStore()
   const { currentUserId, isProviderAllowedForUser } = useAdminStore()
   const supabase = createClient()
 
   useEffect(() => {
-    // Get initial user
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+      setIsLoading(false)
     }
 
     getUser()
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null)
+        setIsLoading(false)
+      }
+    )
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth])
+  }, [supabase])
 
   const getProviderStatus = (providerId: Provider) => {
     const hasApiKey = hasKey(providerId)
@@ -58,6 +62,7 @@ export function MainSidebar() {
   }
 
   const handleSignOut = async () => {
+    setIsSigningOut(true)
     await supabase.auth.signOut()
     router.push("/login")
     router.refresh()
@@ -92,17 +97,17 @@ export function MainSidebar() {
           })}
         </nav>
 
-        {user && (
+        {user && !isLoading && (
           <>
             <Separator />
             <div className="p-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-4 w-4 text-primary" />
+                  <UserIcon className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {user.user_metadata?.name || user.email?.split('@')[0] || "User"}
+                    {user.user_metadata?.full_name || user.email?.split("@")[0] || "User"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {user.email}
@@ -112,10 +117,15 @@ export function MainSidebar() {
                   variant="ghost"
                   size="sm"
                   onClick={handleSignOut}
+                  disabled={isSigningOut}
                   className="h-8 w-8 p-0"
                   title="Sign out"
                 >
-                  <LogOut className="h-4 w-4" />
+                  {isSigningOut ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
