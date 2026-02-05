@@ -1,9 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
-import { usePathname } from "next/navigation"
-import { useSession, signOut } from "next-auth/react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { LayoutDashboard, Video, Images, Key, Lock, LogOut, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -12,6 +11,8 @@ import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useAdminStore } from "@/lib/store/admin-store"
 import { Provider } from "@/lib/types"
+import { createClient } from "@/lib/supabase/client"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -22,9 +23,30 @@ const navigation = [
 
 export function MainSidebar() {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const router = useRouter()
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const { hasKey } = useApiKeysStore()
   const { currentUserId, isProviderAllowedForUser } = useAdminStore()
+  const supabase = createClient()
+
+  useEffect(() => {
+    // Get initial user
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+
+    getUser()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase.auth])
 
   const getProviderStatus = (providerId: Provider) => {
     const hasApiKey = hasKey(providerId)
@@ -35,8 +57,10 @@ export function MainSidebar() {
     return 'no-key'
   }
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: "/login" })
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
   }
 
   return (
@@ -68,30 +92,20 @@ export function MainSidebar() {
           })}
         </nav>
 
-        {session && (
+        {user && (
           <>
             <Separator />
             <div className="p-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
-                {session.user?.image ? (
-                  <Image
-                    src={session.user.image}
-                    alt={session.user.name || "User"}
-                    width={32}
-                    height={32}
-                    className="h-8 w-8 rounded-full"
-                  />
-                ) : (
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                )}
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {session.user?.name || "User"}
+                    {user.user_metadata?.name || user.email?.split('@')[0] || "User"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {session.user?.email}
+                    {user.email}
                   </p>
                 </div>
                 <Button
@@ -99,6 +113,7 @@ export function MainSidebar() {
                   size="sm"
                   onClick={handleSignOut}
                   className="h-8 w-8 p-0"
+                  title="Sign out"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
