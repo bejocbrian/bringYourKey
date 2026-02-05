@@ -119,6 +119,7 @@ export function MainSidebar() {
                   onClick={handleSignOut}
                   disabled={isSigningOut}
                   className="h-8 w-8 p-0"
+                  title="Sign out"
                 >
                   {isSigningOut ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

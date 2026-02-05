@@ -21,7 +21,23 @@ The authentication system uses Supabase Auth with email/password credentials and
 - ✅ Sign-in/sign-up/sign-out functionality
 - ✅ Clean integration with existing UI
 
-## Files Modified/Created
+## Architecture
+
+### Supabase Integration
+
+The application uses Supabase Auth for:
+- User registration and authentication
+- Email verification workflow
+- Session management via HTTP-only cookies
+- Secure token handling
+
+### Client vs Server
+
+- **Client-side** (`src/lib/supabase/client.ts`): Used in React components for auth operations
+- **Server-side** (`src/lib/supabase/server.ts`): Used in Server Components and API routes
+- **Middleware** (`src/lib/supabase/middleware.ts`): Used in Next.js middleware for route protection
+
+## Files Created/Modified
 
 ### New Files
 - `src/lib/supabase/client.ts` - Browser client for Supabase
@@ -71,29 +87,41 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 3. Configure the Site URL: `http://localhost:3000`
 4. Configure Redirect URLs: Add `http://localhost:3000/verify`
 
-### 3. Install Dependencies
+### 6. Run the Application
 
 ```bash
-npm install
+npm run dev
 ```
+
+## Password Requirements
+
+Passwords must meet the following criteria:
+- Minimum 8 characters long
+- At least one uppercase letter (A-Z)
+- At least one lowercase letter (a-z)
+- At least one number (0-9)
 
 ## Route Protection
 
 ### Protected Routes
-All main app routes require authentication:
+
+All main app routes require authentication AND email verification:
 - `/` (Dashboard)
 - `/generate`
 - `/gallery`
 - `/api-keys`
 
 ### Public Routes
+
 These routes are accessible without authentication:
 - `/login`
 - `/signup`
 - `/verify`
 - `/admin/*` (admin area remains separate)
 
-### How It Works
+### Middleware Logic
+
+The middleware (`src/middleware.ts`) enforces the following rules:
 
 1. **Middleware Protection**: The `middleware.ts` file intercepts all requests (except public routes) and checks for an active session
 2. **No Session Redirect**: If no session is found, users are redirected to `/login` with a `callbackUrl` parameter
@@ -124,13 +152,14 @@ These routes are accessible without authentication:
 5. Upon successful authentication, user is redirected to original page or dashboard
 
 ### Sign-Out Process
+
 1. User clicks the sign-out button in the sidebar
 2. Supabase session is cleared
 3. User is redirected to `/login`
 
 ## Disposable Email Blocking
 
-The system includes a comprehensive list of disposable email domains from popular temporary email services including:
+The system includes a comprehensive list of 166+ disposable email domains from popular temporary email services including:
 
 - 10MinuteMail
 - GuerrillaMail
@@ -138,9 +167,10 @@ The system includes a comprehensive list of disposable email domains from popula
 - TempMail
 - YOPmail
 - MailDrop
+- Sharklasers
 - And many more...
 
-### How to Test Disposable Email Blocking
+### How It Works
 
 1. Try to sign up with a temporary email from services like:
    - `user@10minutemail.com`
@@ -148,15 +178,30 @@ The system includes a comprehensive list of disposable email domains from popula
    - `user@yopmail.com`
 2. The signup should be rejected with an error message
 
-## Customization
+### Testing Disposable Email Blocking
+
+Try to sign up with an email from these domains:
+- `test@10minutemail.com`
+- `test@guerrillamail.com`
+- `test@yopmail.com`
+- `test@mailinator.com`
+
+The signup should be rejected with: "Disposable email addresses are not allowed. Please use a permanent email address."
 
 ### Adding New Disposable Domains
 
-Edit `src/lib/auth/disposable-domains.ts` to add new domains to the `DISPOSABLE_DOMAINS` array.
+Edit `src/lib/auth/disposable-domains.ts` and add domains to the `DISPOSABLE_DOMAINS` array:
 
-### Modifying Protected Routes
+```typescript
+export const DISPOSABLE_DOMAINS = [
+  // ... existing domains
+  'new-disposable-domain.com',
+];
+```
 
-Edit `src/middleware.ts` to change which routes require authentication.
+## Customization
+
+### Modifying Email Templates
 
 ### Changing Redirect URLs
 
@@ -182,7 +227,10 @@ For production, update the Site URL and Redirect URLs in your Supabase project s
 
 2. **"Email not confirmed" error**: User needs to verify their email before logging in
 
-3. **Environment variables not loading**: Ensure `.env.local` file is in the project root and run `npm run dev` to restart the development server
+#### 4. Middleware redirect issues
+- Ensure middleware matcher pattern is correct
+- Check browser console for errors
+- Verify Supabase session is being properly set
 
 4. **Session not persisting**: Check that Supabase credentials are correct and the project is active
 

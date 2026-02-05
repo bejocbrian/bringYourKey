@@ -74,7 +74,6 @@ export default function LoginPage() {
     } catch (err) {
       console.error("Login error:", err)
       setError("An unexpected error occurred. Please try again.")
-    } finally {
       setIsLoading(false)
     }
   }
@@ -86,9 +85,9 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Video className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to BYOK</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
-            Sign in to generate AI videos with your own API keys
+            Sign in to your account to continue
           </CardDescription>
         </CardHeader>
         <CardContent>

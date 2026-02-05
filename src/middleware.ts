@@ -12,17 +12,25 @@ export async function middleware(request: NextRequest) {
   
   // Check if the current route is public
   const isPublicRoute = publicRoutes.some(route => {
-    if (route.endsWith("/**")) {
-      const baseRoute = route.slice(0, -2)
-      return nextUrl.pathname.startsWith(baseRoute)
+    if (route === '/admin') {
+      return nextUrl.pathname.startsWith('/admin')
     }
     return nextUrl.pathname === route
   })
 
+  // Allow access to static files and API routes
+  if (
+    nextUrl.pathname.startsWith('/_next') ||
+    nextUrl.pathname.startsWith('/api') ||
+    nextUrl.pathname.includes('.') // static files
+  ) {
+    return supabaseResponse
+  }
+
   // If the route is not public and user is not authenticated, redirect to login
-  if (!isPublicRoute && !isAuthenticated) {
-    const loginUrl = new URL("/login", nextUrl.origin)
-    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname)
+  if (!isPublicRoute && !user) {
+    const loginUrl = new URL('/login', nextUrl.origin)
+    loginUrl.searchParams.set('redirect', nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
   }
 
