@@ -14,7 +14,7 @@ A Next.js application for generating AI videos using your own API keys.
 
 ## Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 18+ and Yarn
 - A Supabase account (free tier available)
 
 ## Getting Started
@@ -24,7 +24,7 @@ A Next.js application for generating AI videos using your own API keys.
 ```bash
 git clone <your-repo-url>
 cd project
-npm install
+yarn install
 ```
 
 ### 2. Set Up Supabase
@@ -59,7 +59,7 @@ In Supabase Dashboard:
 ### 5. Run the Application
 
 ```bash
-npm run dev
+yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
@@ -98,10 +98,10 @@ src/
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
+- `yarn dev` - Start development server
+- `yarn build` - Build for production
+- `yarn start` - Start production server
+- `yarn lint` - Run ESLint
 
 ## Key Technologies
 

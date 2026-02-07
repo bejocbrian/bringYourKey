@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { 
-  AdminUser, 
-  FeatureFlag, 
-  ProviderConfig, 
-  AppSettings, 
-  AnalyticsData, 
+import {
+  AdminUser,
+  FeatureFlag,
+  ProviderConfig,
+  AppSettings,
+  AnalyticsData,
   Provider,
   User
 } from '@/lib/types';
@@ -17,21 +17,21 @@ interface AdminState {
   adminUser: AdminUser | null;
   login: (username: string, password: string) => boolean;
   logout: () => void;
-  
+
   // Feature flags
   features: FeatureFlag[];
   toggleFeature: (id: string) => void;
   isFeatureEnabled: (id: string) => boolean;
-  
+
   // Provider configs
   providerConfigs: Record<Provider, ProviderConfig>;
   updateProviderConfig: (provider: Provider, config: Partial<ProviderConfig>) => void;
   toggleProvider: (provider: Provider) => void;
-  
+
   // App settings
   settings: AppSettings;
   updateSettings: (settings: Partial<AppSettings>) => void;
-  
+
   // Analytics (mock for MVP)
   analytics: AnalyticsData;
   refreshAnalytics: () => void;
@@ -74,6 +74,15 @@ const defaultFeatures: FeatureFlag[] = [
     name: 'Video Gallery',
     description: 'Enable the public/private gallery of generated videos',
     enabled: true,
+    category: 'core',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'dark-mode',
+    name: 'Dark Mode',
+    description: 'Enable dark mode theme for all users',
+    enabled: false,
     category: 'core',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
