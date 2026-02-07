@@ -57,6 +57,18 @@ export const useGenerationStore = create<GenerationState>()(
     }),
     {
       name: 'byok-generations',
+      version: 1,
+      migrate: (persistedState: unknown, version: number) => {
+        if (version === 0) {
+          // One-time reset to remove demo/seeded data
+          return {
+            ...(persistedState as Record<string, unknown>),
+            generations: [],
+            activeGenerations: [],
+          };
+        }
+        return persistedState;
+      },
     }
   )
 );
