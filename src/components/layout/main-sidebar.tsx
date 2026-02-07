@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
-import { useAdminStore } from "@/lib/store/admin-store"
+import { useProfileStore } from "@/lib/store/profile-store"
 import { Provider } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 
@@ -28,7 +28,7 @@ export function MainSidebar() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const { hasKey } = useApiKeysStore()
-  const { currentUserId, isProviderAllowedForUser } = useAdminStore()
+  const { profile, loadProfile, isProviderAllowed } = useProfileStore()
   const supabase = createClient()
 
   useEffect(() => {
@@ -36,25 +36,34 @@ export function MainSidebar() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
       setIsLoading(false)
+      
+      // Load profile when user is authenticated
+      if (user) {
+        await loadProfile()
+      }
     }
 
     getUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setUser(session?.user ?? null)
         setIsLoading(false)
+        
+        if (session?.user) {
+          await loadProfile()
+        }
       }
     )
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase])
+  }, [supabase, loadProfile])
 
   const getProviderStatus = (providerId: Provider) => {
     const hasApiKey = hasKey(providerId)
-    const hasAccess = isProviderAllowedForUser(currentUserId, providerId)
+    const hasAccess = isProviderAllowed(providerId)
 
     if (!hasAccess) return 'locked'
     if (hasApiKey) return 'ready'
@@ -64,6 +73,7 @@ export function MainSidebar() {
   const handleSignOut = async () => {
     setIsSigningOut(true)
     await supabase.auth.signOut()
+    useProfileStore.getState().clearProfile()
     router.push("/login")
     router.refresh()
   }
@@ -107,7 +117,7 @@ export function MainSidebar() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {user.user_metadata?.full_name || user.email?.split("@")[0] || "User"}
+                    {profile?.full_name || user.email?.split("@")[0] || "User"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {user.email}

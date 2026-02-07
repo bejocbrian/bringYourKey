@@ -11,7 +11,7 @@ import { generateVideo } from "@/lib/providers"
 import { PROVIDERS } from "@/lib/services/providers"
 import { useApiKeysStore } from "@/lib/store/api-keys-store"
 import { useGenerationStore } from "@/lib/store/generation-store"
-import { useAdminStore } from "@/lib/store/admin-store"
+import { useProfileStore } from "@/lib/store/profile-store"
 import { GenerationRequest, Provider } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
@@ -19,7 +19,7 @@ import { format } from "date-fns"
 export default function GeneratePage() {
   const { hasKey, getDecryptedKey } = useApiKeysStore()
   const { generations, addGeneration, updateGeneration, activeGenerations } = useGenerationStore()
-  const { currentUserId, users, isProviderAllowedForUser } = useAdminStore()
+  const { profile, isProviderAllowed, getAllowedProviders } = useProfileStore()
   const { toast } = useToast()
 
   const [prompt, setPrompt] = useState("")
@@ -28,8 +28,7 @@ export default function GeneratePage() {
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16" | "1:1">("16:9")
   const [isGenerating, setIsGenerating] = useState(false)
 
-  const currentUser = users.find(u => u.id === currentUserId)
-  const allowedProviders = currentUser?.allowedProviders ?? []
+  const allowedProviders = getAllowedProviders()
 
   const promptLimit = 500
   const providerConfig = PROVIDERS[selectedProvider]
@@ -38,8 +37,8 @@ export default function GeneratePage() {
     [providerConfig]
   )
   const hasApiKey = hasKey(selectedProvider)
-  const isProviderAllowed = isProviderAllowedForUser(currentUserId, selectedProvider)
-  const canGenerate = hasApiKey && isProviderAllowed
+  const isAllowed = isProviderAllowed(selectedProvider)
+  const canGenerate = hasApiKey && isAllowed
 
   useEffect(() => {
     if (!providerConfig.supportedRatios.includes(aspectRatio)) {
@@ -60,7 +59,7 @@ export default function GeneratePage() {
       return
     }
 
-    if (!isProviderAllowed) {
+    if (!isAllowed) {
       toast({
         variant: "destructive",
         title: "Provider access denied",
@@ -207,7 +206,7 @@ export default function GeneratePage() {
                   No API key found. <Link className="text-primary hover:underline" href="/api-keys">Add a key</Link> to enable generation.
                 </p>
               )}
-              {!isProviderAllowed && hasApiKey && (
+              {!isAllowed && hasApiKey && (
                 <p className="text-xs text-destructive">
                   You do not have access to this provider. Contact your administrator.
                 </p>
