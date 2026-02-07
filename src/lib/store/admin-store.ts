@@ -40,6 +40,7 @@ interface AdminState {
   users: User[];
   currentUserId: string;
   setCurrentUser: (userId: string) => void;
+  addUser: (user: User) => void;
   toggleUserProviderAccess: (userId: string, provider: Provider) => void;
   getUserAllowedProviders: (userId: string) => Provider[];
   isProviderAllowedForUser: (userId: string, provider: Provider) => boolean;
@@ -237,6 +238,12 @@ export const useAdminStore = create<AdminState>()(
 
       setCurrentUser: (userId) => {
         set({ currentUserId: userId });
+      },
+
+      addUser: (user) => {
+        set((state) => ({
+          users: [...state.users, user]
+        }));
       },
 
       toggleUserProviderAccess: (userId, provider) => {
