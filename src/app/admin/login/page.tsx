@@ -9,16 +9,14 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/client"
-import { useAdminStore } from "@/lib/store/admin-store"
 import { useToast } from "@/hooks/use-toast"
 
 export default function AdminLoginPage() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { login } = useAdminStore()
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
@@ -27,9 +25,9 @@ export default function AdminLoginPage() {
     e.preventDefault()
     setError(null)
 
-    // Validate username
-    if (!username || username.trim() === "") {
-      setError("Please enter a username")
+    // Validate email
+    if (!email || !email.includes("@")) {
+      setError("Please enter a valid email address")
       return
     }
 
@@ -38,7 +36,7 @@ export default function AdminLoginPage() {
     try {
       // Sign in with Supabase
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: username,
+        email,
         password,
       })
 
@@ -73,9 +71,6 @@ export default function AdminLoginPage() {
         setIsLoading(false)
         return
       }
-
-      // Also set the local admin store for backward compatibility
-      login("admin", "admin123") // This sets isAuthenticated to true
 
       toast({
         title: "Login successful",
@@ -114,18 +109,18 @@ export default function AdminLoginPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <Shield className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
-                  id="username"
-                  type="text"
-                  inputMode="text"
-                  autoComplete="username"
-                  placeholder="admin"
+                  id="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="admin@example.com"
                   className="pl-10"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>

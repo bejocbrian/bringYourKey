@@ -2,18 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { useAdminStore } from "@/lib/store/admin-store"
 import { AdminHeader } from "@/components/layout/admin-header"
 import { AdminNav } from "@/components/layout/admin-nav"
 import { createClient } from "@/lib/supabase/client"
-import { Profile } from "@/lib/types"
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated } = useAdminStore()
   const router = useRouter()
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)

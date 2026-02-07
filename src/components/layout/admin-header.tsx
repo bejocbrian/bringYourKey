@@ -4,13 +4,11 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Shield, LogOut, Bell, User, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useAdminStore } from "@/lib/store/admin-store"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Profile } from "@/lib/types"
 
 export function AdminHeader() {
-  const { logout } = useAdminStore()
   const router = useRouter()
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -36,7 +34,6 @@ export function AdminHeader() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    logout()
     router.push("/admin/login")
   }
 
