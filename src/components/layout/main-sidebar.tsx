@@ -55,7 +55,7 @@ export function MainSidebar() {
   const getProviderStatus = (providerId: Provider) => {
     const hasApiKey = hasKey(providerId)
     const hasAccess = isProviderAllowedForUser(currentUserId, providerId)
-    
+
     if (!hasAccess) return 'locked'
     if (hasApiKey) return 'ready'
     return 'no-key'
@@ -133,7 +133,7 @@ export function MainSidebar() {
         )}
 
         <Separator />
-        
+
         <div className="border-t p-4">
           <div className="rounded-lg bg-muted p-3">
             <p className="text-xs font-semibold text-muted-foreground">Provider Status</p>
@@ -151,8 +151,8 @@ export function MainSidebar() {
                       )}
                       <span className={cn(
                         "h-2 w-2 rounded-full",
-                        status === 'ready' ? "bg-emerald-500" : 
-                        status === 'locked' ? "bg-rose-500" : "bg-muted-foreground/40"
+                        status === 'ready' ? "bg-emerald-500" :
+                          status === 'locked' ? "bg-rose-500" : "bg-muted-foreground/40"
                       )} />
                     </div>
                   </div>
