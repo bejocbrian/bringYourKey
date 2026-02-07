@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Shield, Lock, Mail, ArrowRight, Loader2 } from "lucide-react"
+import { Shield, Lock, ArrowRight, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,14 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/client"
 import { useAdminStore } from "@/lib/store/admin-store"
 import { useToast } from "@/hooks/use-toast"
-import { isDisposableEmail } from "@/lib/auth/disposable-domains"
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   const { login } = useAdminStore()
   const router = useRouter()
   const { toast } = useToast()
@@ -28,15 +27,9 @@ export default function AdminLoginPage() {
     e.preventDefault()
     setError(null)
 
-    // Validate email
-    if (!email || !email.includes("@")) {
-      setError("Please enter a valid email address")
-      return
-    }
-
-    // Check for disposable email
-    if (isDisposableEmail(email)) {
-      setError("Disposable email addresses are not allowed.")
+    // Validate username
+    if (!username || username.trim() === "") {
+      setError("Please enter a username")
       return
     }
 
@@ -45,7 +38,7 @@ export default function AdminLoginPage() {
     try {
       // Sign in with Supabase
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: username,
         password,
       })
 
@@ -113,7 +106,7 @@ export default function AdminLoginPage() {
             Sign in with your admin account to access the panel
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <CardContent className="space-y-4">
             {error && (
               <Alert variant="destructive">
@@ -121,16 +114,18 @@ export default function AdminLoginPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Shield className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="admin@company.com"
+                  id="username"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="username"
+                  placeholder="admin"
                   className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </div>
