@@ -102,3 +102,16 @@ export interface User {
   lastActive: string;
   generationsCount: number;
 }
+
+export interface Profile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: 'user' | 'admin' | 'superadmin';
+  status: 'active' | 'inactive' | 'suspended';
+  allowed_providers: Provider[];
+  generations_count: number;
+  last_active: string | null;
+  created_at: string;
+  updated_at: string;
+}
