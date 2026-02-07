@@ -1,17 +1,118 @@
 "use client"
 
-import { Search, Filter, MoreVertical, Ban, Eye, Mail, Users } from "lucide-react"
+import { useState } from "react"
+import { Search, Filter, MoreVertical, Ban, Eye, Mail, Users, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAdminStore } from "@/lib/store/admin-store"
 import { PROVIDERS } from "@/lib/services/providers"
-import { Provider } from "@/lib/types"
+import { Provider, User } from "@/lib/types"
+import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 
+type UserFormState = {
+  name: string
+  email: string
+  status: User["status"]
+  lastActive: string
+  generationsCount: string
+  allowedProviders: Provider[]
+}
+
+const getDateTimeLocalValue = (date: Date) => date.toISOString().slice(0, 16)
+
 export default function UsersPage() {
-  const { users, toggleUserProviderAccess } = useAdminStore()
+  const { users, toggleUserProviderAccess, addUser } = useAdminStore()
+  const { toast } = useToast()
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [formData, setFormData] = useState<UserFormState>({
+    name: "",
+    email: "",
+    status: "active",
+    lastActive: getDateTimeLocalValue(new Date()),
+    generationsCount: "0",
+    allowedProviders: ["meta-moviegen"],
+  })
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      status: "active",
+      lastActive: getDateTimeLocalValue(new Date()),
+      generationsCount: "0",
+      allowedProviders: ["meta-moviegen"],
+    })
+  }
+
+  const openAddUserDialog = () => {
+    resetForm()
+    setDialogOpen(true)
+  }
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open)
+    if (!open) {
+      resetForm()
+    }
+  }
+
+  const handleAddUser = () => {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.lastActive || !formData.generationsCount.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing details",
+        description: "Fill out all fields before creating the user.",
+      })
+      return
+    }
+
+    const generations = Number.parseInt(formData.generationsCount, 10)
+    if (Number.isNaN(generations) || generations < 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid generations",
+        description: "Enter a valid generations count.",
+      })
+      return
+    }
+
+    if (formData.allowedProviders.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Select a provider",
+        description: "Choose at least one provider for this user.",
+      })
+      return
+    }
+
+    const userId = globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID()
+      : `user-${Date.now()}`
+
+    const newUser: User = {
+      id: userId,
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      status: formData.status,
+      allowedProviders: formData.allowedProviders,
+      lastActive: new Date(formData.lastActive).toISOString(),
+      generationsCount: generations,
+    }
+
+    addUser(newUser)
+    setDialogOpen(false)
+    resetForm()
+    toast({
+      title: "User created",
+      description: `${newUser.name} can now access the platform.`,
+    })
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -33,6 +134,10 @@ export default function UsersPage() {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Users</h1>
           <p className="text-slate-500 mt-1">Manage and monitor application users. Toggle provider access per user.</p>
         </div>
+        <Button className="bg-indigo-600 hover:bg-indigo-700" onClick={openAddUserDialog}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add User
+        </Button>
       </div>
 
       <Card>
@@ -175,6 +280,100 @@ export default function UsersPage() {
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create new user</DialogTitle>
+            <DialogDescription>Invite a user and configure their provider access.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="user-name">Name</Label>
+              <Input
+                id="user-name"
+                placeholder="Jane Doe"
+                value={formData.name}
+                onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="user-email">Email</Label>
+              <Input
+                id="user-email"
+                type="email"
+                placeholder="jane@company.com"
+                value={formData.email}
+                onChange={(event) => setFormData((prev) => ({ ...prev, email: event.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="user-status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, status: value as User["status"] }))}
+              >
+                <SelectTrigger id="user-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="user-last-active">Last active</Label>
+              <Input
+                id="user-last-active"
+                type="datetime-local"
+                value={formData.lastActive}
+                onChange={(event) => setFormData((prev) => ({ ...prev, lastActive: event.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="user-generations">Generations count</Label>
+              <Input
+                id="user-generations"
+                type="number"
+                min="0"
+                value={formData.generationsCount}
+                onChange={(event) => setFormData((prev) => ({ ...prev, generationsCount: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Provider access</Label>
+              <div className="flex flex-wrap gap-3">
+                {(Object.entries(PROVIDERS) as [Provider, { name: string }][]).map(([providerId, provider]) => (
+                  <div key={providerId} className="flex items-center gap-2 rounded-md border px-3 py-2">
+                    <Switch
+                      checked={formData.allowedProviders.includes(providerId)}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          allowedProviders: checked
+                            ? [...prev.allowedProviders, providerId]
+                            : prev.allowedProviders.filter((allowed) => allowed !== providerId),
+                        }))
+                      }
+                      className="data-[state=checked]:bg-emerald-500"
+                    />
+                    <span className="text-sm text-slate-700">{provider.name}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">Defaults to Meta Movie Gen access.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => handleDialogChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddUser}>Create User</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
