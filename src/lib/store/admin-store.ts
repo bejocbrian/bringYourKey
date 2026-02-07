@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {
-  AdminUser,
   FeatureFlag,
   ProviderConfig,
   AppSettings,
@@ -12,12 +11,6 @@ import {
 import { PROVIDERS } from '@/lib/services/providers';
 
 interface AdminState {
-  // Auth
-  isAuthenticated: boolean;
-  adminUser: AdminUser | null;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
-
   // Feature flags
   features: FeatureFlag[];
   toggleFeature: (id: string) => void;
@@ -157,31 +150,12 @@ const emptyUsers: User[] = [];
 export const useAdminStore = create<AdminState>()(
   persist(
     (set, get) => ({
-      isAuthenticated: false,
-      adminUser: null,
       features: defaultFeatures,
       providerConfigs: defaultProviderConfigs,
       settings: defaultSettings,
       analytics: emptyAnalytics,
       users: emptyUsers,
       currentUserId: '',
-
-      login: (username, password) => {
-        // Simple password-based auth for MVP
-        if (username === 'admin' && password === 'admin123') {
-          const user: AdminUser = {
-            id: '1',
-            username: 'admin',
-            role: 'superadmin',
-            lastLogin: new Date().toISOString()
-          };
-          set({ isAuthenticated: true, adminUser: user });
-          return true;
-        }
-        return false;
-      },
-
-      logout: () => set({ isAuthenticated: false, adminUser: null }),
 
       toggleFeature: (id) => set((state) => {
         // If this is a provider feature flag, also sync the provider config
