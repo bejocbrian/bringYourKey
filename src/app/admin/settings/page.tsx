@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Save, Globe, Palette, Database, ShieldCheck } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Save, Globe, Palette, Database, ShieldCheck, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,19 +10,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAdminStore } from "@/lib/store/admin-store"
 import { useToast } from "@/hooks/use-toast"
+import { AppSettings } from "@/lib/types"
 
 export default function SettingsPage() {
-  const { settings, updateSettings } = useAdminStore()
+  const { settings, isLoadingSettings, updateSettings } = useAdminStore()
   const { toast } = useToast()
-  const [formData, setFormData] = useState(settings)
 
-  const handleSave = () => {
-    updateSettings(formData)
+  // Initialize with settings if available, or empty structure
+  const [formData, setFormData] = useState<AppSettings | null>(settings)
+
+  // Sync formData with settings when settings load
+  useEffect(() => {
+    if (settings) {
+      setFormData(settings)
+    }
+  }, [settings])
+
+  const handleSave = async () => {
+    if (!formData) return
+
+    // Save each key that changed or just simple one-by-one for now since updateSettings takes (key, value)
+    // Ideally we batch update or update specific sections
+    // For now, let's just update the known keys
+    const keys: (keyof AppSettings)[] = ['appName', 'logoUrl', 'theme', 'storage', 'defaults']
+
+    for (const key of keys) {
+      if (formData[key]) {
+        await updateSettings(key, formData[key])
+      }
+    }
+
     toast({
       title: "Settings saved",
       description: "Application configuration has been updated successfully.",
     })
   }
+
+  if (isLoadingSettings && !settings) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    )
+  }
+
+  if (!formData) return null;
 
   return (
     <div className="space-y-6">
@@ -58,6 +90,7 @@ export default function SettingsPage() {
         </TabsList>
 
         <div className="mt-6">
+          {/* Form content mapping formData */}
           <TabsContent value="general" className="space-y-6">
             <Card>
               <CardHeader>
@@ -67,43 +100,20 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-2">
                   <Label htmlFor="appName">Application Name</Label>
-                  <Input 
-                    id="appName" 
-                    value={formData.appName} 
+                  <Input
+                    id="appName"
+                    value={formData.appName}
                     onChange={(e) => setFormData({ ...formData, appName: e.target.value })}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="logoUrl">Logo URL</Label>
-                  <Input 
-                    id="logoUrl" 
+                  <Input
+                    id="logoUrl"
                     placeholder="https://example.com/logo.png"
-                    value={formData.logoUrl || ''} 
+                    value={formData.logoUrl || ''}
                     onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
                   />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>Manage how the application sends notifications.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Notifications</Label>
-                    <p className="text-sm text-slate-500">Send reports and alerts via email.</p>
-                  </div>
-                  <Switch checked={true} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Slack Integration</Label>
-                    <p className="text-sm text-slate-500">Post updates to a Slack channel.</p>
-                  </div>
-                  <Switch checked={false} />
                 </div>
               </CardContent>
             </Card>
@@ -119,16 +129,16 @@ export default function SettingsPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="primaryColor">Primary Color</Label>
                   <div className="flex gap-2">
-                    <Input 
-                      id="primaryColor" 
-                      value={formData.theme.primaryColor} 
-                      onChange={(e) => setFormData({ 
-                        ...formData, 
-                        theme: { ...formData.theme, primaryColor: e.target.value } 
+                    <Input
+                      id="primaryColor"
+                      value={formData.theme.primaryColor}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        theme: { ...formData.theme, primaryColor: e.target.value }
                       })}
                     />
-                    <div 
-                      className="w-10 h-10 rounded border" 
+                    <div
+                      className="w-10 h-10 rounded border"
                       style={{ backgroundColor: formData.theme.primaryColor }}
                     />
                   </div>
@@ -138,11 +148,11 @@ export default function SettingsPage() {
                     <Label>Dark Mode by Default</Label>
                     <p className="text-sm text-slate-500">Set the default theme for new users.</p>
                   </div>
-                  <Switch 
-                    checked={formData.theme.darkMode} 
-                    onCheckedChange={(checked) => setFormData({ 
-                      ...formData, 
-                      theme: { ...formData.theme, darkMode: checked } 
+                  <Switch
+                    checked={formData.theme.darkMode}
+                    onCheckedChange={(checked) => setFormData({
+                      ...formData,
+                      theme: { ...formData.theme, darkMode: checked }
                     })}
                   />
                 </div>
@@ -159,25 +169,25 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-2">
                   <Label htmlFor="maxGenerations">Max Generations Per User</Label>
-                  <Input 
-                    id="maxGenerations" 
+                  <Input
+                    id="maxGenerations"
                     type="number"
-                    value={formData.storage.maxGenerationsPerUser} 
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      storage: { ...formData.storage, maxGenerationsPerUser: parseInt(e.target.value) } 
+                    value={formData.storage.maxGenerationsPerUser}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      storage: { ...formData.storage, maxGenerationsPerUser: parseInt(e.target.value) }
                     })}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="autoDelete">Auto-delete after (days)</Label>
-                  <Input 
-                    id="autoDelete" 
+                  <Input
+                    id="autoDelete"
                     type="number"
-                    value={formData.storage.autoDeleteAfterDays} 
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      storage: { ...formData.storage, autoDeleteAfterDays: parseInt(e.target.value) } 
+                    value={formData.storage.autoDeleteAfterDays}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      storage: { ...formData.storage, autoDeleteAfterDays: parseInt(e.target.value) }
                     })}
                   />
                 </div>
@@ -187,28 +197,9 @@ export default function SettingsPage() {
 
           <TabsContent value="security" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Admin Security</CardTitle>
-                <CardDescription>Configure security settings for the admin panel.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Two-Factor Authentication</Label>
-                    <p className="text-sm text-slate-500">Require 2FA for all admin accounts.</p>
-                  </div>
-                  <Switch checked={false} />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                  <Input id="sessionTimeout" type="number" defaultValue={60} />
-                </div>
+              <CardContent className="pt-6">
+                <p className="text-slate-500">Security settings are managed in your auth provider.</p>
               </CardContent>
-              <CardFooter className="border-t px-6 py-4">
-                <Button variant="outline" className="text-rose-600 border-rose-200 hover:bg-rose-50">
-                  Force Logout All Admins
-                </Button>
-              </CardFooter>
             </Card>
           </TabsContent>
         </div>

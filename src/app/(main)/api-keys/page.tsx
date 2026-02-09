@@ -18,6 +18,7 @@ export default function ApiKeysPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeProvider, setActiveProvider] = useState<Provider>("google-veo")
   const [keyName, setKeyName] = useState("")
+  const [projectId, setProjectId] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [showKey, setShowKey] = useState<Record<Provider, boolean>>({
     "google-veo": false,
@@ -30,6 +31,7 @@ export default function ApiKeysPage() {
     const existing = apiKeys[provider]
     setActiveProvider(provider)
     setKeyName(existing?.name ?? "")
+    setProjectId(existing?.projectId ?? "")
     setApiKey(existing ? getDecryptedKey(provider) ?? "" : "")
     setDialogShowKey(false)
     setDialogOpen(true)
@@ -45,7 +47,7 @@ export default function ApiKeysPage() {
       return
     }
 
-    addKey(activeProvider, apiKey.trim(), keyName.trim() || PROVIDERS[activeProvider].name)
+    addKey(activeProvider, apiKey.trim(), keyName.trim() || PROVIDERS[activeProvider].name, projectId.trim())
     setDialogOpen(false)
     toast({
       title: "API key saved",
@@ -77,8 +79,8 @@ export default function ApiKeysPage() {
           const status = !providerKey
             ? "unset"
             : decrypted
-            ? "valid"
-            : "invalid"
+              ? "valid"
+              : "invalid"
 
           return (
             <Card key={providerId}>
@@ -92,8 +94,8 @@ export default function ApiKeysPage() {
                           status === "valid"
                             ? "text-xs rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5"
                             : status === "invalid"
-                            ? "text-xs rounded-full bg-red-100 text-red-700 px-2 py-0.5"
-                            : "text-xs rounded-full bg-muted px-2 py-0.5"
+                              ? "text-xs rounded-full bg-red-100 text-red-700 px-2 py-0.5"
+                              : "text-xs rounded-full bg-muted px-2 py-0.5"
                         }
                       >
                         {status === "valid" ? "Connected" : status === "invalid" ? "Invalid" : "Not set"}
@@ -130,8 +132,8 @@ export default function ApiKeysPage() {
                     {status === "valid"
                       ? "Your key is stored locally and ready to use."
                       : status === "invalid"
-                      ? "We couldn't decrypt this key. Please re-save it."
-                      : "No key stored yet. Add one to enable generation."}
+                        ? "We couldn't decrypt this key. Please re-save it."
+                        : "No key stored yet. Add one to enable generation."}
                   </div>
                 </div>
 
@@ -220,6 +222,17 @@ export default function ApiKeysPage() {
                 onChange={(event) => setKeyName(event.target.value)}
               />
             </div>
+            {activeProvider === "google-veo" && (
+              <div className="space-y-2">
+                <Label htmlFor="project-id">Project ID (Required for Google)</Label>
+                <Input
+                  id="project-id"
+                  placeholder="e.g. my-gcp-project-id"
+                  value={projectId}
+                  onChange={(event) => setProjectId(event.target.value)}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="api-key">API Key</Label>
               <Input

@@ -4,6 +4,7 @@ export interface ApiKey {
   provider: Provider;
   key: string;
   name: string;
+  projectId?: string; // Required for Google Vertex AI
   createdAt: string;
 }
 
@@ -34,27 +35,25 @@ export interface FeatureFlag {
   description: string;
   enabled: boolean;
   category: 'core' | 'experimental' | 'provider';
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProviderConfig {
-  id: Provider;
+  id: string; // provider id
+  name: string;
   enabled: boolean;
-  isDefault: boolean;
-  rateLimit: {
-    requestsPerMinute: number;
-    requestsPerHour: number;
-  };
-  costEstimate: {
-    perGeneration: number;
-    currency: string;
-  };
-  settings: {
-    maxDuration: number;
-    minDuration: number;
-    supportedRatios: string[];
-  };
+  is_default: boolean;
+  rate_limit_rpm: number;
+  rate_limit_rph: number;
+  cost_per_generation: number;
+  cost_currency: string;
+  max_duration: number;
+  min_duration: number;
+  supported_ratios: string[];
+  metadata?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface AppSettings {
@@ -91,17 +90,14 @@ export interface AnalyticsData {
     words: string[];
     count: number;
   };
+  overview: {
+    totalUsers: number;
+    totalGenerations: number;
+    activeUsers24h: number; // Placeholder for now
+  };
 }
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  status: 'active' | 'inactive' | 'suspended';
-  allowedProviders: Provider[];
-  lastActive: string;
-  generationsCount: number;
-}
+export type User = Profile;
 
 export interface Profile {
   id: string;

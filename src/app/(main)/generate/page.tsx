@@ -17,9 +17,9 @@ import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 
 export default function GeneratePage() {
-  const { hasKey, getDecryptedKey } = useApiKeysStore()
+  const { hasKey, getDecryptedKey, apiKeys } = useApiKeysStore()
   const { generations, addGeneration, updateGeneration, activeGenerations } = useGenerationStore()
-  const { profile, isProviderAllowed, getAllowedProviders } = useProfileStore()
+  const { profile, isProviderAllowed, getAllowedProviders, loadProfile, isLoading: isLoadingProfile } = useProfileStore()
   const { toast } = useToast()
 
   const [prompt, setPrompt] = useState("")
@@ -27,6 +27,11 @@ export default function GeneratePage() {
   const [duration, setDuration] = useState(4)
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16" | "1:1">("16:9")
   const [isGenerating, setIsGenerating] = useState(false)
+
+  // Load user profile when component mounts
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
 
   const allowedProviders = getAllowedProviders()
 
@@ -104,6 +109,7 @@ export default function GeneratePage() {
           aspectRatio,
         },
         accessToken: apiKey,
+        projectId: apiKeys[selectedProvider]?.projectId,
       })
 
       updateGeneration(generationId, {
@@ -185,8 +191,8 @@ export default function GeneratePage() {
                   {Object.entries(PROVIDERS).map(([providerId, provider]) => {
                     const hasAccess = allowedProviders.includes(providerId as Provider)
                     return (
-                      <SelectItem 
-                        key={providerId} 
+                      <SelectItem
+                        key={providerId}
                         value={providerId}
                         disabled={!hasAccess}
                       >
@@ -227,37 +233,22 @@ export default function GeneratePage() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Duration</Label>
-                <Select value={duration.toString()} onValueChange={(value) => setDuration(Number(value))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {durationOptions.map((value) => (
-                      <SelectItem key={value} value={value.toString()}>
-                        {value} second{value > 1 ? "s" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Aspect Ratio</Label>
-                <Select value={aspectRatio} onValueChange={(value) => setAspectRatio(value as "16:9" | "9:16" | "1:1")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providerConfig.supportedRatios.map((ratio) => (
+            <div className="space-y-2">
+              <Label>Aspect Ratio</Label>
+              <Select value={aspectRatio} onValueChange={(value) => setAspectRatio(value as "16:9" | "9:16")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerConfig.supportedRatios
+                    .filter((ratio) => ratio !== "1:1")
+                    .map((ratio) => (
                       <SelectItem key={ratio} value={ratio}>
                         {ratio}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">

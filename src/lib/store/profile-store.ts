@@ -3,16 +3,19 @@ import { persist } from "zustand/middleware"
 import { Profile, Provider } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 
+// Create client once outside the store
+const supabase = createClient()
+
 interface ProfileState {
   profile: Profile | null
   isLoading: boolean
   error: string | null
-  
+
   // Actions
   loadProfile: () => Promise<void>
   clearProfile: () => void
   refreshProfile: () => Promise<void>
-  
+
   // Helpers
   isProviderAllowed: (provider: Provider) => boolean
   getAllowedProviders: () => Provider[]
@@ -27,12 +30,10 @@ export const useProfileStore = create<ProfileState>()(
 
       loadProfile: async () => {
         set({ isLoading: true, error: null })
-        
+
         try {
-          const supabase = createClient()
-          
           const { data: { user } } = await supabase.auth.getUser()
-          
+
           if (!user) {
             set({ profile: null, isLoading: false })
             return

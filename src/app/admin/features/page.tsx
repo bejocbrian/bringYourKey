@@ -2,16 +2,24 @@
 
 import { useAdminStore } from "@/lib/store/admin-store"
 import { FeatureToggle } from "@/components/admin/feature-toggle"
-import { Shield, Sparkles, Beaker } from "lucide-react"
+import { Shield, Sparkles, Beaker, Loader2 } from "lucide-react"
 
 export default function FeaturesPage() {
-  const { features } = useAdminStore()
+  const { features, isLoadingFeatures } = useAdminStore()
 
   const categories = [
     { id: 'core', name: 'Core Features', icon: Shield },
     { id: 'provider', name: 'Provider Features', icon: Sparkles },
     { id: 'experimental', name: 'Experimental', icon: Beaker },
-  ]
+  ] as const
+
+  if (isLoadingFeatures && features.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -22,7 +30,9 @@ export default function FeaturesPage() {
 
       {categories.map((category) => {
         const categoryFeatures = features.filter(f => f.category === category.id)
-        if (categoryFeatures.length === 0 && category.id !== 'experimental') return null
+
+        // Show category if it has features OR if we're done loading (so empty section is visible if intended)
+        if (categoryFeatures.length === 0 && category.id !== 'experimental' && !isLoadingFeatures) return null
 
         return (
           <section key={category.id} className="space-y-4">

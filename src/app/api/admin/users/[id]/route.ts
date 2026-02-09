@@ -1,69 +1,43 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server"
-import { Profile } from "@/lib/types"
+import { createClient } from "@/lib/supabase/server"
+import { checkAdminAccess } from "@/lib/auth/permissions"
 
-async function checkIsAdmin(supabase: Awaited<ReturnType<typeof createClient>>): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  return profile?.role === "admin" || profile?.role === "superadmin"
-}
-
+// PATCH: Update user role or providers
 export async function PATCH(
-  request: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  // Check access - admins can update providers, only superadmins can update roles
+  const { authorized, error, status, role: adminRole } = await checkAdminAccess('admin')
+  if (!authorized) return NextResponse.json({ error }, { status })
+
   try {
+    const body = await req.json()
+    const { role, allowed_providers } = body
+
+    // Only superadmins can change roles
+    if (role && adminRole !== 'superadmin') {
+      return NextResponse.json({ error: 'Only superadmins can change user roles' }, { status: 403 })
+    }
+
+    const updateData: any = { updated_at: new Date().toISOString() }
+    if (role) updateData.role = role
+    if (allowed_providers) updateData.allowed_providers = allowed_providers
+
     const supabase = await createClient()
-    
-    const isAdmin = await checkIsAdmin(supabase)
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 })
-    }
-
-    const userId = params.id
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 })
-    }
-
-    const body = await request.json()
-    const { status, allowed_providers, generations_count, last_active, full_name } = body
-
-    const serviceRoleClient = await createServiceRoleClient()
-
-    // Build update object with only provided fields
-    const updateData: Partial<Profile> = {}
-    if (status !== undefined) updateData.status = status
-    if (allowed_providers !== undefined) updateData.allowed_providers = allowed_providers
-    if (generations_count !== undefined) updateData.generations_count = generations_count
-    if (last_active !== undefined) updateData.last_active = last_active
-    if (full_name !== undefined) updateData.full_name = full_name
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 })
-    }
-
-    const { data: profile, error } = await serviceRoleClient
-      .from("profiles")
+    const { data, error: dbError } = await supabase
+      .from('profiles')
       .update(updateData)
-      .eq("id", userId)
+      .eq('id', params.id)
       .select()
       .single()
 
-    if (error) {
-      console.error("Error updating profile:", error)
-      return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
+    if (dbError) {
+      return NextResponse.json({ error: dbError.message }, { status: 500 })
     }
 
-    return NextResponse.json({ user: profile as Profile })
-  } catch (error) {
-    console.error("Unexpected error in PATCH /api/admin/users/[id]:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(data)
+  } catch (e) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 }

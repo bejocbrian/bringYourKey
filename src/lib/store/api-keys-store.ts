@@ -6,7 +6,7 @@ import { decryptKey, encryptKey, generateKey } from '@/lib/services/encryption';
 interface ApiKeysState {
   apiKeys: Record<Provider, ApiKey | null>;
   encryptionKey: string;
-  addKey: (provider: Provider, key: string, name: string) => void;
+  addKey: (provider: Provider, key: string, name: string, projectId?: string) => void;
   removeKey: (provider: Provider) => void;
   getDecryptedKey: (provider: Provider) => string | null;
   hasKey: (provider: Provider) => boolean;
@@ -24,13 +24,14 @@ export const useApiKeysStore = create<ApiKeysState>()(
       apiKeys: emptyKeys,
       encryptionKey: generateKey(),
 
-      addKey: (provider, key, name) => {
+      addKey: (provider, key, name, projectId) => {
         const encryptionKey = get().encryptionKey || generateKey();
         const encryptedKey = encryptKey(key, encryptionKey);
         const newKey: ApiKey = {
           provider,
           key: encryptedKey,
           name: name || provider,
+          projectId: projectId,
           createdAt: new Date().toISOString(),
         };
 

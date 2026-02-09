@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing access token.' }, { status: 401 });
   }
 
-  let body: { prompt?: string; settings?: { duration?: number; aspectRatio?: string } } = {};
+  let body: { prompt?: string; settings?: { duration?: number; aspectRatio?: string }; projectId?: string } = {};
   try {
-    body = (await request.json()) as { prompt?: string; settings?: { duration?: number; aspectRatio?: string } };
+    body = (await request.json()) as { prompt?: string; settings?: { duration?: number; aspectRatio?: string }; projectId?: string };
   } catch {
     return NextResponse.json({ error: 'Invalid request payload.' }, { status: 400 });
   }
@@ -66,12 +66,23 @@ export async function POST(request: NextRequest) {
     },
   };
 
-  const response = await fetch(`${VERTEX_BASE_URL}:predictLongRunning`, {
+  const projectId = body.projectId || PROJECT_ID;
+  const isApiKey = accessToken.startsWith('AIza');
+
+  const baseUrl = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}`;
+  const url = `${baseUrl}:predictLongRunning` + (isApiKey ? `?key=${accessToken}` : '');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (!isApiKey) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -79,7 +90,8 @@ export async function POST(request: NextRequest) {
 
   if (!response.ok || !json?.name) {
     const errorMessage = (json?.error as { message?: string } | undefined)?.message || 'Vertex AI request failed.';
-    return NextResponse.json({ error: errorMessage }, { status: response.status || 502 });
+    // If it's a 403/401, it might be because the user didn't enable Vertex AI API or permissions
+    return NextResponse.json({ error: errorMessage, details: json?.error }, { status: response.status || 502 });
   }
 
   return NextResponse.json({ operation: json.name });
@@ -96,10 +108,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Operation name is required.' }, { status: 400 });
   }
 
-  const response = await fetch(buildOperationUrl(operation), {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const isApiKey = accessToken.startsWith('AIza');
+  const url = buildOperationUrl(operation) + (isApiKey ? `?key=${accessToken}` : '');
+
+  const headers: Record<string, string> = {};
+  if (!isApiKey) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(url, {
+    headers,
   });
 
   const json = (await response.json().catch(() => null)) as Record<string, unknown> | null;
