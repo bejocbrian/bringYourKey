@@ -1,188 +1,416 @@
-# BYOK - Bring Your Own Key AI Video Generator
+# BYOK Studio - Bring Your Own Key Video Platform
 
-A Next.js application for generating AI videos using your own API keys.
+A premium video generation platform with **Glassmorphism UI**, multi-modal input system, and AI-powered video creation using Veo 3.1 API.
 
-## Features
+## ✨ Features
 
-- 🔐 **Secure Authentication**: Custom email/password authentication with Supabase
-- ✅ **Email Verification**: Required email verification before app access
-- 🚫 **Disposable Email Blocking**: Prevents temporary email addresses (166+ domains)
-- 🎥 **AI Video Generation**: Generate videos using various AI providers
-- 🔑 **BYOK Model**: Use your own API keys for AI services
-- 📊 **Dashboard**: Track your video generation history
-- 🎨 **Gallery**: View and manage your generated videos
+### 🎨 **Premium Glassmorphism UI**
+- Dark mode with gradient backgrounds
+- Frosted glass panels with backdrop blur
+- Smooth animations and micro-interactions
+- Responsive and modern design
 
-## Prerequisites
+### 🎬 **Three Generation Modes**
+1. **Text-to-Video (T2V)**: Generate videos from text prompts
+2. **Image-to-Video (I2V)**: Add motion to static images
+3. **Ingredients**: Reusable assets with @ tag system for character consistency
 
-- Node.js 18+ and Yarn
-- A Supabase account (free tier available)
+### 📝 **Asset Management**
+- Ingredient vault for characters, objects, styles
+- @ tag system for prompt references
+- Reference image uploads
+- Consistent character/object generation
 
-## Getting Started
+### 🎞️ **Linear Sequencer**
+- Horizontal timeline for clip management
+- Drag-and-drop reordering
+- Multi-clip export with stitching
+- Preview and thumbnails
 
-### 1. Clone and Install
+### ⚡ **Real-time Status**
+- Live generation progress
+- Status indicators: "Dreaming", "Rendering", "Polishing"
+- Automatic clip addition to sequencer
+- Error handling and retry
 
-```bash
-git clone <your-repo-url>
-cd project
-yarn install
-```
+---
 
-### 2. Set Up Supabase
+## 🚀 Getting Started
 
-1. Go to [Supabase](https://supabase.com/) and create a new project
-2. Wait for the project to be provisioned (~2 minutes)
-3. Go to Project Settings > API
-4. Copy the Project URL and anon/public key
+### Prerequisites
 
-### 3. Configure Environment Variables
+- **Node.js** 18+ and npm/yarn
+- **Python** 3.9+
+- **Google Cloud Platform** account with:
+  - Vertex AI API enabled
+  - Cloud Storage bucket
+  - Service account credentials
+- (Optional) **FFmpeg** for local video stitching
 
-Create a `.env.local` file in the project root:
-
-```bash
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-### 4. Configure Supabase Auth
-
-In Supabase Dashboard:
-
-1. Go to **Authentication > Providers**
-2. Ensure Email provider is enabled
-3. Go to **Authentication > Settings**
-4. Enable "Confirm email"
-5. Set Site URL to `http://localhost:3000` (for development)
-6. Add redirect URLs:
-   - `http://localhost:3000/**`
-
-### 5. Run the Application
+### Frontend Setup
 
 ```bash
-yarn dev
+# Navigate to the project root (if not already there)
+cd bringYourKey
+
+# Install dependencies
+npm install
+
+# Create environment file
+cp .env.example .env.local
+
+# Update .env.local with your values:
+# VITE_API_URL=http://localhost:8000/api
+# VITE_SUPABASE_URL=your_supabase_url
+# VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Start development server
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+Frontend runs on `http://localhost:5173`
 
-## Authentication System
-
-This project uses a custom email/password authentication system with:
-
-- **Email verification requirement**: Users must verify their email before accessing the app
-- **Disposable email blocking**: Prevents signup with temporary email addresses
-- **Strong password requirements**: Minimum 8 characters with uppercase, lowercase, and numbers
-- **Secure session management**: HTTP-only cookies via Supabase Auth
-
-For detailed authentication documentation, see [AUTHENTICATION.md](./AUTHENTICATION.md).
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── (main)/          # Protected main app routes
-│   ├── admin/           # Separate admin area
-│   ├── login/           # Login page
-│   ├── signup/          # Registration page
-│   └── verify/          # Email verification page
-├── components/
-│   ├── ui/              # Reusable UI components
-│   └── layout/          # Layout components
-├── lib/
-│   ├── auth/            # Auth helpers and disposable domains list
-│   ├── supabase/        # Supabase client configuration
-│   ├── services/        # AI provider services
-│   └── store/           # Zustand state management
-└── middleware.ts        # Route protection middleware
-```
-
-## Available Scripts
-
-- `yarn dev` - Start development server
-- `yarn build` - Build for production
-- `yarn start` - Start production server
-- `yarn lint` - Run ESLint
-
-## Key Technologies
-
-- **Framework**: Next.js 14 (App Router)
-- **Authentication**: Supabase Auth
-- **UI Components**: Radix UI + Tailwind CSS
-- **State Management**: Zustand
-- **Type Safety**: TypeScript
-- **Icons**: Lucide React
-
-## Deployment
-
-### Environment Variables
-
-Set the following environment variables in your production environment:
+### Backend Setup
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_production_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_production_anon_key
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# Install dependencies
+python -m pip install -r requirements.txt
+
+# Create environment file
+cp .env.example .env
+
+# Update .env with your GCP credentials:
+# GCP_PROJECT_ID=your-project-id
+# GCS_BUCKET_NAME=byok-videos
+# GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+
+# Run the server
+python main.py
 ```
 
-### Supabase Configuration for Production
+Backend runs on `http://localhost:8000`
 
-1. Update Site URL to your production domain (e.g., `https://yourdomain.com`)
-2. Add production redirect URLs:
-   - `https://yourdomain.com/**`
-3. Configure custom SMTP for reliable email delivery (optional but recommended)
+---
 
-### Deploy on Vercel
+## 📁 Project Structure
 
-The easiest way to deploy is with [Vercel](https://vercel.com):
+```
+bringYourKey/
+├── src/
+│   ├── components/           # React components
+│   │   ├── WorkspaceCanvas.tsx   # 16:9 video player
+│   │   ├── MultiModalSidebar.tsx # Tabbed input system
+│   │   ├── TextTab.tsx           # T2V generation
+│   │   ├── ImageTab.tsx          # I2V generation
+│   │   ├── IngredientsTab.tsx    # Asset library
+│   │   └── LinearSequencer.tsx   # Timeline & export
+│   ├── store/                # Zustand state management
+│   │   ├── videoStore.ts         # Generation state
+│   │   ├── sequencerStore.ts     # Timeline clips
+│   │   └── ingredientStore.ts    # Asset vault
+│   ├── services/             # API integration
+│   │   └── api.ts                # Backend API calls
+│   ├── utils/                # Utilities
+│   │   └── tagParser.ts          # @ tag parsing
+│   ├── lib/                  # Shared libraries
+│   └── index.css             # Glassmorphism styles
+│
+├── backend/
+│   ├── routers/              # API routes
+│   │   └── generation.py         # Video generation endpoints
+│   ├── services/             # Business logic
+│   │   ├── veo_service.py        # Veo 3.1 integration
+│   │   ├── gcs_service.py        # Cloud Storage
+│   │   └── ffmpeg_service.py     # Video stitching
+│   ├── models/               # Data models
+│   │   └── schemas.py            # Pydantic schemas
+│   ├── main.py               # FastAPI app
+│   └── requirements.txt      # Python dependencies
+```
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
+---
 
-1. Push your code to GitHub
-2. Import the repository in Vercel
-3. Add environment variables
-4. Deploy
+## 🎨 UI Components
 
-See [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for other platforms.
+### Workspace Canvas
+- Centered 16:9 video player
+- Glassmorphism frame with glow effect
+- Generation status overlay
+- Custom video controls
 
-## Troubleshooting
+### Multi-Modal Sidebar
+**Three Tabs:**
 
-### Common Issues
+1. **Text Tab**
+   - Prompt input (500 char limit)
+   - @ tag autocomplete
+   - Aspect ratio selector (16:9, 9:16, 1:1)
+   - Audio prompt toggle
+   - Generate button
 
-**"Invalid API key" error**
-- Verify environment variables are set correctly
-- Restart the development server after changing `.env.local`
+2. **Image Tab**
+   - Drag-and-drop upload
+   - Image preview
+   - Motion intensity slider (0-10)
+   - Aspect ratio selector
 
-**Verification emails not sending**
-- Check Supabase Dashboard > Authentication > Logs
-- Verify "Confirm email" is enabled
-- Check spam folder
+3. **Ingredients Tab**
+   - Asset grid view
+   - Add new ingredient
+   - Tag assignment (@Hero, @CityStreet)
+   - Reference image upload
+   - Type categorization
 
-**Session not persisting**
-- Ensure cookies are enabled in browser
-- Verify Site URL is correctly configured in Supabase
+### Linear Sequencer
+- Horizontal clip scrolling
+- Drag-to-reorder
+- Clip thumbnails
+- Duration indicators
+- Export button
 
-For more troubleshooting tips, see [AUTHENTICATION.md](./AUTHENTICATION.md).
+---
 
-## Documentation
+## 🔌 API Endpoints
 
-- [AUTHENTICATION.md](./AUTHENTICATION.md) - Complete authentication system documentation
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Supabase Documentation](https://supabase.com/docs)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+### Text-to-Video
+```http
+POST /api/generate/t2v
+Content-Type: application/json
 
-## Security
+{
+  "prompt": "A cinematic shot of @Hero walking...",
+  "aspectRatio": "16:9",
+  "audioPrompt": "Upbeat music",
+  "referenceImages": ["url1", "url2"]
+}
 
-- Never commit `.env.local` to version control
-- Rotate Supabase keys regularly
-- Use HTTPS in production
-- Keep dependencies updated
+Response:
+{
+  "jobId": "uuid",
+  "status": "pending",
+  "message": "Video generation started"
+}
+```
 
-## License
+### Image-to-Video
+```http
+POST /api/generate/i2v
+Content-Type: multipart/form-data
 
-[Add your license here]
+image: <file>
+motionIntensity: 7
+aspectRatio: 16:9
 
-## Support
+Response:
+{
+  "jobId": "uuid",
+  "status": "pending"
+}
+```
 
-For issues or questions:
-1. Check [AUTHENTICATION.md](./AUTHENTICATION.md) for auth-related issues
-2. Review [Supabase Documentation](https://supabase.com/docs)
-3. Open an issue on GitHub
+### Status Polling
+```http
+GET /api/generation/{jobId}/status
+
+Response:
+{
+  "jobId": "uuid",
+  "status": "rendering",
+  "progress": 50,
+  "resultUrl": null
+}
+```
+
+### Export Video
+```http
+POST /api/export
+Content-Type: application/json
+
+{
+  "clipIds": ["job1", "job2"],
+  "format": "mp4",
+  "quality": "high"
+}
+
+Response:
+{
+  "exportUrl": "https://...",
+  "message": "Export complete"
+}
+```
+
+---
+
+## 🎯 How to Use
+
+### 1. Generate a Video
+
+**Option A: Text-to-Video**
+1. Click "Text" tab
+2. Enter your prompt (use @ tags for ingredients)
+3. Select aspect ratio
+4. (Optional) Toggle audio and add custom prompt
+5. Click "Generate Video"
+
+**Option B: Image-to-Video**
+1. Click "Image" tab
+2. Drag & drop or upload an image
+3. Adjust motion intensity slider
+4. Click "Generate Video"
+
+### 2. Manage Ingredients
+
+1. Click "Ingredients" tab
+2. Click "+" to add new ingredient
+3. Enter tag (e.g., "Hero")
+4. Add reference images
+5. Use @Hero in prompts to maintain consistency
+
+### 3. Create Final Export
+
+1. Generate multiple clips
+2. Clips appear in timeline at bottom
+3. Drag to reorder if needed
+4. Click "Export Final Video"
+5. Download stitched video
+
+---
+
+## 🔧 Configuration
+
+### Glassmorphism Theme
+
+Customize in `tailwind.config.js`:
+
+```js
+glass: {
+  bg: "rgba(255, 255, 255, 0.05)",
+  border: "rgba(255, 255, 255, 0.1)",
+  hover: "rgba(255, 255, 255, 0.08)",
+}
+```
+
+### API Integration
+
+Update backend services in `backend/services/`:
+
+- `veo_service.py` - Replace mock with actual Veo API calls
+- `gcs_service.py` - Add real GCS upload/download
+- `ffmpeg_service.py` - Implement video stitching
+
+---
+
+## 🚢 Deployment
+
+### Frontend (Vercel - Free)
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+cd bringYourKey
+vercel
+
+# Set environment variables in Vercel dashboard
+```
+
+### Backend Options
+
+**Option 1: Railway (Free Tier)**
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Deploy
+cd backend
+railway login
+railway init
+railway up
+```
+
+**Option 2: Google Cloud Run**
+```bash
+# Build container
+gcloud builds submit --tag gcr.io/PROJECT_ID/byok-backend
+
+# Deploy
+gcloud run deploy byok-backend \
+  --image gcr.io/PROJECT_ID/byok-backend \
+  --platform managed \
+  --region us-central1
+```
+
+---
+
+## 🧪 Testing
+
+### Frontend
+```bash
+npm run test
+```
+
+### Backend
+```bash
+pytest tests/
+```
+
+### Integration
+```bash
+npm run test:integration
+```
+
+---
+
+## 📝 License
+
+MIT License
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Please read the contributing guidelines first.
+
+---
+
+## 💡 Tips
+
+- Use descriptive @ tags for better ingredient organization
+- Start with lower motion intensity for subtle effects
+- Preview clips before exporting final video
+- Export in high quality for best results
+
+---
+
+## 🆘 Support
+
+For issues:
+1. Check the backend logs for API errors
+2. Verify GCP credentials are correct
+3. Ensure Vertex AI API is enabled
+4. Contact support with error details
+
+---
+
+## 🎓 Learn More
+
+- [Veo 3.1 Documentation](https://cloud.google.com/vertex-ai)
+- [FastAPI Docs](https://fastapi.tiangolo.com)
+- [React + Vite](https://vitejs.dev)
+- [Zustand Guide](https://zustand-demo.pmnd.rs)
+
+---
+
+**Built with ❤️ using React, FastAPI, and Google Vertex AI**
