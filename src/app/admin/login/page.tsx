@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Shield, Lock, ArrowRight, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,8 @@ export default function AdminLoginPage() {
 
   const router = useRouter()
   const { toast } = useToast()
+
+  // Create Supabase client
   const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,15 +43,11 @@ export default function AdminLoginPage() {
       })
 
       if (signInError) {
-        setError(signInError.message)
-        setIsLoading(false)
-        return
+        throw signInError
       }
 
       if (!authData.user) {
-        setError("Authentication failed")
-        setIsLoading(false)
-        return
+        throw new Error("Authentication failed")
       }
 
       // Check if user has admin role
@@ -60,16 +58,13 @@ export default function AdminLoginPage() {
         .single()
 
       if (profileError || !profile) {
-        setError("Failed to verify admin privileges")
-        setIsLoading(false)
-        return
+        console.error("Profile error details:", profileError)
+        throw new Error(`Failed to verify admin privileges${profileError ? `: ${profileError.message}` : " (no profile found)"}`)
       }
 
       if (profile.role !== "admin" && profile.role !== "superadmin") {
-        setError("You do not have admin privileges")
         await supabase.auth.signOut()
-        setIsLoading(false)
-        return
+        throw new Error("You do not have admin privileges")
       }
 
       toast({
@@ -77,9 +72,13 @@ export default function AdminLoginPage() {
         description: "Welcome to the admin panel.",
       })
       router.push("/admin")
-    } catch (err) {
+    } catch (err: any) {
       console.error("Admin login error:", err)
-      setError("An unexpected error occurred. Please try again.")
+      if (err.name === 'AbortError') {
+        // Ignore abort errors
+        return
+      }
+      setError(err.message || "An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -143,9 +142,9 @@ export default function AdminLoginPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button 
-              type="submit" 
-              className="w-full bg-indigo-600 hover:bg-indigo-700" 
+            <Button
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -163,7 +162,7 @@ export default function AdminLoginPage() {
           </CardFooter>
         </form>
       </Card>
-      
+
       <p className="mt-8 text-sm text-slate-500 max-w-md text-center">
         Admin access requires a Supabase account with admin or superadmin role.
         Regular user accounts cannot access this panel.

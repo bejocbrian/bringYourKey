@@ -5,6 +5,7 @@ export interface ProviderGenerationInput {
   prompt: string;
   settings: GenerationRequest['settings'];
   accessToken: string;
+  projectId?: string;
 }
 
 export interface ProviderGenerationResult {
@@ -84,14 +85,14 @@ const pollGoogleOperation = async (operation: string, accessToken: string) => {
   throw new Error('Video generation timed out.');
 };
 
-const generateWithGoogle = async ({ prompt, settings, accessToken }: ProviderGenerationInput): Promise<ProviderGenerationResult> => {
+const generateWithGoogle = async ({ prompt, settings, accessToken, projectId }: ProviderGenerationInput): Promise<ProviderGenerationResult> => {
   const response = await fetch(GOOGLE_GENERATE_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ prompt, settings }),
+    body: JSON.stringify({ prompt, settings, projectId }),
   });
 
   let payload: { operation?: string } | null = null;

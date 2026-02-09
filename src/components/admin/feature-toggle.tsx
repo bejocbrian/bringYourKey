@@ -27,7 +27,7 @@ export function FeatureToggle({ feature }: FeatureToggleProps) {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-slate-900">{feature.name}</h3>
-              <Badge variant="outline" className={cn("text-[10px] uppercase px-1.5 py-0", categoryColors[feature.category])}>
+              <Badge variant="outline" className={cn("text-[10px] uppercase px-1.5 py-0", categoryColors[feature.category as keyof typeof categoryColors] || "bg-slate-100")}>
                 {feature.category}
               </Badge>
             </div>
@@ -35,12 +35,12 @@ export function FeatureToggle({ feature }: FeatureToggleProps) {
               {feature.description}
             </p>
             <p className="text-[10px] text-slate-400 mt-2">
-              Last updated: {new Date(feature.updatedAt).toLocaleDateString()}
+              Last updated: {new Date(feature.updated_at).toLocaleDateString()}
             </p>
           </div>
-          <Switch 
-            checked={feature.enabled} 
-            onCheckedChange={() => toggleFeature(feature.id)} 
+          <Switch
+            checked={feature.enabled}
+            onCheckedChange={(checked) => toggleFeature(feature.id, checked)}
           />
         </div>
       </CardContent>

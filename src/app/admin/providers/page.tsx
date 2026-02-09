@@ -1,45 +1,44 @@
 "use client"
 
-import { Plus, RefreshCcw, HelpCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { ProvidersTable } from "@/components/admin/providers-table"
+import { useAdminStore } from "@/lib/store/admin-store"
+import { ProviderCard } from "@/components/admin/provider-card"
+import { Loader2 } from "lucide-react"
 
 export default function ProvidersPage() {
+  const { providerConfigs, isLoadingProviders, updateProviderConfig } = useAdminStore()
+
+  const handleToggle = (id: string, enabled: boolean) => {
+    updateProviderConfig(id, { enabled })
+  }
+
+  if (isLoadingProviders && providerConfigs.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Providers</h1>
-          <p className="text-slate-500 mt-1">Manage and configure video AI providers.</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline">
-            <RefreshCcw className="h-4 w-4 mr-2" />
-            Sync Status
-          </Button>
-          <Button className="bg-indigo-600 hover:bg-indigo-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Provider
-          </Button>
-        </div>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Provider Configuration</h1>
+        <p className="text-slate-500 mt-1">Manage AI video generation providers, rates, and costs.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Video Providers</CardTitle>
-                <CardDescription>Configure rate limits, costs, and default settings for each provider.</CardDescription>
-              </div>
-              <HelpCircle className="h-5 w-5 text-slate-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ProvidersTable />
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {providerConfigs.map((config) => (
+          <ProviderCard
+            key={config.id}
+            config={config}
+            onToggle={handleToggle}
+          />
+        ))}
+        {providerConfigs.length === 0 && !isLoadingProviders && (
+          <div className="col-span-full py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <p className="text-slate-500">No provider configurations found.</p>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { AdminHeader } from "@/components/layout/admin-header"
 import { AdminNav } from "@/components/layout/admin-nav"
 import { createClient } from "@/lib/supabase/client"
+import { useAdminStore } from "@/lib/store/admin-store"
+
 
 export default function AdminLayout({
   children,
@@ -16,6 +18,8 @@ export default function AdminLayout({
   const [mounted, setMounted] = useState(false)
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Create Supabase client
   const supabase = createClient()
 
   useEffect(() => {
@@ -32,33 +36,45 @@ export default function AdminLayout({
         return
       }
 
-      // Check Supabase session and admin role
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
+      try {
+        // Check Supabase session and admin role
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user) {
+          console.error("Auth error:", authError)
+          setIsAuthorized(false)
+          setIsLoading(false)
+          router.push("/admin/login")
+          return
+        }
+
+        // Check admin role
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+
+        if (profileError || !profile || (profile.role !== "admin" && profile.role !== "superadmin")) {
+          console.error("Profile error or unauthorized:", profileError, profile)
+          setIsAuthorized(false)
+          setIsLoading(false)
+          await supabase.auth.signOut()
+          router.push("/admin/login")
+          return
+        }
+
+        setIsAuthorized(true)
+        setIsLoading(false)
+
+        // Initialize admin data
+        useAdminStore.getState().init().catch(console.error)
+      } catch (err) {
+        console.error("Unexpected auth check error:", err)
         setIsAuthorized(false)
         setIsLoading(false)
         router.push("/admin/login")
-        return
       }
-
-      // Check admin role
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single()
-
-      if (!profile || (profile.role !== "admin" && profile.role !== "superadmin")) {
-        setIsAuthorized(false)
-        setIsLoading(false)
-        await supabase.auth.signOut()
-        router.push("/admin/login")
-        return
-      }
-
-      setIsAuthorized(true)
-      setIsLoading(false)
     }
 
     checkAuth()
@@ -76,7 +92,7 @@ export default function AdminLayout({
     return () => {
       subscription.unsubscribe()
     }
-  }, [mounted, pathname, router, supabase])
+  }, [mounted, pathname, router])
 
   if (!mounted || isLoading) {
     return (

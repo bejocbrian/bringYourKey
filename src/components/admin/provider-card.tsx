@@ -5,7 +5,7 @@ import { ProviderConfig } from "@/lib/types"
 
 interface ProviderCardProps {
   config: ProviderConfig
-  onToggle: (id: string) => void
+  onToggle: (id: string, enabled: boolean) => void
 }
 
 export function ProviderCard({ config, onToggle }: ProviderCardProps) {
@@ -14,26 +14,30 @@ export function ProviderCard({ config, onToggle }: ProviderCardProps) {
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="space-y-1">
           <CardTitle className="text-base font-bold capitalize">
-            {config.id.replace('-', ' ')}
+            {config.name}
           </CardTitle>
           <CardDescription>
-            {config.isDefault && <Badge variant="secondary">Default</Badge>}
+            {config.is_default && <Badge variant="secondary">Default</Badge>}
           </CardDescription>
         </div>
-        <Switch 
-          checked={config.enabled} 
-          onCheckedChange={() => onToggle(config.id)} 
+        <Switch
+          checked={config.enabled}
+          onCheckedChange={(checked) => onToggle(config.id, checked)}
         />
       </CardHeader>
       <CardContent>
         <div className="text-xs text-muted-foreground space-y-1">
           <div className="flex justify-between">
             <span>Rate Limit:</span>
-            <span className="font-medium text-foreground">{config.rateLimit.requestsPerMinute} RPM</span>
+            <span className="font-medium text-foreground">{config.rate_limit_rpm} RPM</span>
           </div>
           <div className="flex justify-between">
             <span>Cost:</span>
-            <span className="font-medium text-foreground">${config.costEstimate.perGeneration} / gen</span>
+            <span className="font-medium text-foreground">${config.cost_per_generation} / gen</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Duration:</span>
+            <span className="font-medium text-foreground">{config.max_duration}s max</span>
           </div>
         </div>
       </CardContent>

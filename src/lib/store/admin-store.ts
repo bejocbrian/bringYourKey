@@ -6,257 +6,229 @@ import {
   AppSettings,
   AnalyticsData,
   Provider,
-  User
+  Profile
 } from '@/lib/types';
-import { PROVIDERS } from '@/lib/services/providers';
+import { createClient } from '@/lib/supabase/client';
+import { RealtimeChannel } from '@supabase/supabase-js';
+
+// Create client once
+const supabase = createClient();
 
 interface AdminState {
   // Feature flags
   features: FeatureFlag[];
-  toggleFeature: (id: string) => void;
-  isFeatureEnabled: (id: string) => boolean;
+  isLoadingFeatures: boolean;
+  loadFeatures: () => Promise<void>;
+  toggleFeature: (id: string, enabled: boolean) => Promise<void>;
+  isFeatureEnabled: (key: string) => boolean;
 
   // Provider configs
-  providerConfigs: Record<Provider, ProviderConfig>;
-  updateProviderConfig: (provider: Provider, config: Partial<ProviderConfig>) => void;
-  toggleProvider: (provider: Provider) => void;
+  providerConfigs: ProviderConfig[];
+  isLoadingProviders: boolean;
+  loadProviders: () => Promise<void>;
+  updateProviderConfig: (id: string, updates: Partial<ProviderConfig>) => Promise<void>;
 
   // App settings
-  settings: AppSettings;
-  updateSettings: (settings: Partial<AppSettings>) => void;
+  settings: AppSettings | null;
+  isLoadingSettings: boolean;
+  loadSettings: () => Promise<void>;
+  updateSettings: (key: string, value: any) => Promise<void>;
 
-  // Analytics (mock for MVP)
+  // Users
+  users: Profile[];
+  totalUsers: number;
+  isLoadingUsers: boolean;
+  loadUsers: (page?: number, search?: string) => Promise<void>;
+  updateUserRole: (userId: string, role: string) => Promise<void>;
+  updateUserProviders: (userId: string, providers: string[]) => Promise<void>;
+
+  // Analytics
   analytics: AnalyticsData;
-  refreshAnalytics: () => void;
+  isLoadingAnalytics: boolean;
+  loadAnalytics: () => Promise<void>;
+  refreshAnalytics: () => Promise<void>;
 
-  // Users and provider access
-  users: User[];
-  currentUserId: string;
-  setCurrentUser: (userId: string) => void;
-  addUser: (user: User) => void;
-  toggleUserProviderAccess: (userId: string, provider: Provider) => void;
-  getUserAllowedProviders: (userId: string) => Provider[];
-  isProviderAllowedForUser: (userId: string, provider: Provider) => boolean;
+  // Helper to init all
+  init: () => Promise<void>;
+
+  // Subscriptions
+  subscriptions: RealtimeChannel[];
+  subscribeToAll: () => void;
+  unsubscribeAll: () => void;
 }
-
-const createProviderFeatures = (): FeatureFlag[] => {
-  const now = new Date().toISOString();
-  return Object.entries(PROVIDERS).map(([id, provider]) => ({
-    id: `provider-${id}`,
-    name: provider.name,
-    description: `Enable ${provider.name} API for video generation`,
-    enabled: true,
-    category: 'provider' as const,
-    createdAt: now,
-    updatedAt: now,
-  }));
-};
-
-const defaultFeatures: FeatureFlag[] = [
-  {
-    id: 'video-generation',
-    name: 'Video Generation',
-    description: 'Enable core video generation features',
-    enabled: true,
-    category: 'core',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'gallery',
-    name: 'Video Gallery',
-    description: 'Enable the public/private gallery of generated videos',
-    enabled: true,
-    category: 'core',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'dark-mode',
-    name: 'Dark Mode',
-    description: 'Enable dark mode theme for all users',
-    enabled: false,
-    category: 'core',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'batch-generation',
-    name: 'Batch Generation',
-    description: 'Allow users to generate multiple videos at once',
-    enabled: false,
-    category: 'experimental',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  ...createProviderFeatures()
-];
-
-const defaultProviderConfigs: Record<Provider, ProviderConfig> = {
-  'google-veo': {
-    id: 'google-veo',
-    enabled: true,
-    isDefault: true,
-    rateLimit: { requestsPerMinute: 10, requestsPerHour: 100 },
-    costEstimate: { perGeneration: 0.1, currency: 'USD' },
-    settings: { maxDuration: 60, minDuration: 1, supportedRatios: ['16:9', '9:16', '1:1'] }
-  },
-  'meta-moviegen': {
-    id: 'meta-moviegen',
-    enabled: true,
-    isDefault: false,
-    rateLimit: { requestsPerMinute: 5, requestsPerHour: 50 },
-    costEstimate: { perGeneration: 0.15, currency: 'USD' },
-    settings: { maxDuration: 30, minDuration: 1, supportedRatios: ['16:9', '9:16'] }
-  },
-  'runway-gen3': {
-    id: 'runway-gen3',
-    enabled: true,
-    isDefault: false,
-    rateLimit: { requestsPerMinute: 15, requestsPerHour: 200 },
-    costEstimate: { perGeneration: 0.2, currency: 'USD' },
-    settings: { maxDuration: 10, minDuration: 1, supportedRatios: ['16:9'] }
-  }
-};
-
-const defaultSettings: AppSettings = {
-  appName: 'Bring Your Key',
-  theme: {
-    primaryColor: '#6366f1',
-    darkMode: true,
-  },
-  defaults: {
-    provider: 'google-veo',
-    duration: 5,
-    aspectRatio: '16:9',
-  },
-  storage: {
-    maxGenerationsPerUser: 100,
-    autoDeleteAfterDays: 30,
-  }
-};
-
-const emptyAnalytics: AnalyticsData = {
-  generations: [],
-  providerUsage: [],
-  topPrompts: {
-    words: [],
-    count: 0
-  }
-};
-
-const emptyUsers: User[] = [];
 
 export const useAdminStore = create<AdminState>()(
   persist(
     (set, get) => ({
-      features: defaultFeatures,
-      providerConfigs: defaultProviderConfigs,
-      settings: defaultSettings,
-      analytics: emptyAnalytics,
-      users: emptyUsers,
-      currentUserId: '',
+      // Features
+      features: [],
+      isLoadingFeatures: false,
+      loadFeatures: async () => {
+        set({ isLoadingFeatures: true });
+        const { data } = await supabase.from('feature_flags').select('*').order('created_at', { ascending: false });
+        if (data) set({ features: data as FeatureFlag[] });
+        set({ isLoadingFeatures: false });
+      },
+      toggleFeature: async (id, enabled) => {
+        // Optimistic update
+        const currentFeatures = get().features;
+        set({ features: currentFeatures.map(f => f.id === id ? { ...f, enabled } : f) });
 
-      toggleFeature: (id) => set((state) => {
-        // If this is a provider feature flag, also sync the provider config
-        if (id.startsWith('provider-')) {
-          const providerId = id.replace('provider-', '') as Provider;
-          const currentEnabled = state.providerConfigs[providerId]?.enabled ?? true;
-          return {
-            features: state.features.map(f =>
-              f.id === id ? { ...f, enabled: !f.enabled, updatedAt: new Date().toISOString() } : f
-            ),
-            providerConfigs: {
-              ...state.providerConfigs,
-              [providerId]: {
-                ...state.providerConfigs[providerId],
-                enabled: !currentEnabled
-              }
-            }
-          };
+        const { error } = await supabase.from('feature_flags').update({ enabled }).eq('id', id);
+        if (error) {
+          // Rollback
+          set({ features: currentFeatures });
+          console.error('Failed to toggle feature:', error);
         }
-        return {
-          features: state.features.map(f =>
-            f.id === id ? { ...f, enabled: !f.enabled, updatedAt: new Date().toISOString() } : f
-          )
-        };
-      }),
-
-      isFeatureEnabled: (id) => {
-        const feature = get().features.find(f => f.id === id);
+      },
+      isFeatureEnabled: (key: string) => {
+        const feature = get().features.find(f => f.name === key || f.id === key);
         return feature ? feature.enabled : false;
       },
 
-      updateProviderConfig: (provider, config) => set((state) => ({
-        providerConfigs: {
-          ...state.providerConfigs,
-          [provider]: { ...state.providerConfigs[provider], ...config }
+      // Providers
+      providerConfigs: [],
+      isLoadingProviders: false,
+      loadProviders: async () => {
+        set({ isLoadingProviders: true });
+        const { data } = await supabase.from('provider_configs').select('*').order('name');
+        if (data) set({ providerConfigs: data as unknown as ProviderConfig[] });
+        set({ isLoadingProviders: false });
+      },
+      updateProviderConfig: async (id, updates) => {
+        const currentConfigs = get().providerConfigs;
+        set({ providerConfigs: currentConfigs.map(p => p.id === id ? { ...p, ...updates } : p) });
+
+        const { error } = await supabase.from('provider_configs').update(updates).eq('id', id);
+        if (error) {
+          set({ providerConfigs: currentConfigs });
+          console.error('Failed to update provider:', error);
         }
-      })),
-
-      toggleProvider: (provider) => set((state) => {
-        const newEnabled = !state.providerConfigs[provider].enabled;
-        const featureId = `provider-${provider}`;
-        return {
-          providerConfigs: {
-            ...state.providerConfigs,
-            [provider]: {
-              ...state.providerConfigs[provider],
-              enabled: newEnabled
-            }
-          },
-          features: state.features.map(f =>
-            f.id === featureId ? { ...f, enabled: newEnabled, updatedAt: new Date().toISOString() } : f
-          )
-        };
-      }),
-
-      updateSettings: (settings) => set((state) => ({
-        settings: { ...state.settings, ...settings }
-      })),
-
-      refreshAnalytics: () => {
-        set({ analytics: emptyAnalytics });
       },
 
-      setCurrentUser: (userId) => {
-        set({ currentUserId: userId });
+      // Settings
+      settings: null,
+      isLoadingSettings: false,
+      loadSettings: async () => {
+        set({ isLoadingSettings: true });
+        const { data } = await supabase.from('app_settings').select('*');
+        if (data) {
+          const settingsObj = data.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+          set({ settings: settingsObj as AppSettings });
+        }
+        set({ isLoadingSettings: false });
+      },
+      updateSettings: async (key, value) => {
+        const { error } = await supabase.from('app_settings').upsert({ key, value });
+        if (error) console.error('Failed to update settings:', error);
+        else get().loadSettings(); // Reload to confirm
       },
 
-      addUser: (user) => {
-        set((state) => ({
-          users: [...state.users, user]
-        }));
+      // Users
+      users: [],
+      totalUsers: 0,
+      isLoadingUsers: false,
+      loadUsers: async (page = 1, search = '') => {
+        set({ isLoadingUsers: true });
+        let query = supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+
+        if (search) {
+          query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`);
+        }
+
+        const limit = 20;
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+
+        const { data, count, error } = await query.range(from, to);
+
+        if (data) {
+          set({ users: data as Profile[], totalUsers: count || 0 });
+        }
+        if (error) console.error(error);
+        set({ isLoadingUsers: false });
+      },
+      updateUserRole: async (userId, role) => {
+        const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
+        if (error) console.error(error);
+        else get().loadUsers();
+      },
+      updateUserProviders: async (userId, providers) => {
+        const { error } = await supabase.from('profiles').update({ allowed_providers: providers }).eq('id', userId);
+        if (error) console.error(error);
+        else get().loadUsers();
       },
 
-      toggleUserProviderAccess: (userId, provider) => {
-        set((state) => ({
-          users: state.users.map((user) => {
-            if (user.id !== userId) return user;
-            const isAllowed = user.allowedProviders.includes(provider);
-            return {
-              ...user,
-              allowedProviders: isAllowed
-                ? user.allowedProviders.filter((p) => p !== provider)
-                : [...user.allowedProviders, provider]
-            };
-          })
-        }));
+      // Analytics
+      analytics: {
+        generations: [],
+        providerUsage: [],
+        topPrompts: { words: [], count: 0 },
+        overview: { totalUsers: 0, totalGenerations: 0, activeUsers24h: 0 }
+      },
+      isLoadingAnalytics: false,
+      loadAnalytics: async () => {
+        set({ isLoadingAnalytics: true })
+        try {
+          const response = await fetch('/api/admin/analytics')
+          if (response.ok) {
+            const data = await response.json()
+            set({ analytics: data })
+          }
+        } catch (error) {
+          console.error("Failed to load analytics:", error)
+        } finally {
+          set({ isLoadingAnalytics: false })
+        }
+      },
+      refreshAnalytics: async () => {
+        await get().loadAnalytics()
       },
 
-      getUserAllowedProviders: (userId) => {
-        const user = get().users.find((u) => u.id === userId);
-        return user?.allowedProviders ?? [];
+      // Init
+      init: async () => {
+        await Promise.all([
+          get().loadFeatures(),
+          get().loadProviders(),
+          get().loadSettings(),
+          get().loadUsers(),
+          get().loadAnalytics()
+        ]);
+        get().subscribeToAll();
       },
 
-      isProviderAllowedForUser: (userId, provider) => {
-        const user = get().users.find((u) => u.id === userId);
-        if (!user) return false;
-        return user.allowedProviders.includes(provider);
+      // Subscriptions
+      subscriptions: [],
+      subscribeToAll: () => {
+        const { subscriptions } = get();
+        if (subscriptions.length > 0) return; // Already subscribed
+
+        const featureSub = supabase.channel('features-local')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'feature_flags' }, () => get().loadFeatures())
+          .subscribe();
+
+        const providerSub = supabase.channel('providers-local')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'provider_configs' }, () => get().loadProviders())
+          .subscribe();
+
+        const settingsSub = supabase.channel('settings-local')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => get().loadSettings())
+          .subscribe();
+
+        set({ subscriptions: [featureSub, providerSub, settingsSub] });
       },
+      unsubscribeAll: () => {
+        get().subscriptions.forEach(sub => sub.unsubscribe());
+        set({ subscriptions: [] });
+      }
     }),
     {
-      name: 'byok-admin-store',
+      name: 'byok-admin-store-v2',
+      partialize: (state) => ({
+        features: state.features,
+        providerConfigs: state.providerConfigs,
+        settings: state.settings
+      }),
     }
   )
 );
